@@ -63,9 +63,15 @@ public final class Konstanten {
     /** Tastband beim Gehen (nur aufrecht erlaubt): {unten, oben}. */
     public static final double[] GEHEN_BAND = { 1.30, 1.60 };
 
-    /** Tastband im Stehen je Körperstufe: {unten, oben}. */
+    /**
+     * Tiefste Höhe, die eine Hand ertasten kann (knapp über dem Boden). Damit sind niedrige Stufen ertastbar,
+     * der Boden selbst und flache Gegenstände unter dieser Höhe aber nicht.
+     */
+    public static final double TAST_MIN_HOEHE = 0.05;
+
+    /** Tastband im Stehen je Körperstufe: {unten, oben}; das tiefste Band beginnt bei {@link #TAST_MIN_HOEHE}. */
     public static final double[][] STEHEN_BAENDER = { { 1.40, 1.80 }, { 1.00, 1.40 }, { 0.60, 1.00 },
-            { 0.20, 0.60 } };
+            { TAST_MIN_HOEHE, 0.60 } };
 
     /**
      * Untere Grenze des Tastbands.
@@ -222,6 +228,9 @@ public final class Konstanten {
     /** Länge eines Einzelschritts (kurzer Tastendruck): ein halber Schritt. */
     public static final double HALBSCHRITT = SCHRITTLAENGE / 2;
 
+    /** Länge eines Einzelschritts in geduckter Haltung (Körperstufen 2 bis 4), vorwärts und rückwärts. */
+    public static final double DUCK_SCHRITT = 0.10;
+
     /** Nominelle Größe eines Drehschritts. */
     public static final double DREH_SCHRITT = Math.toRadians(15.0);
 
@@ -261,6 +270,12 @@ public final class Konstanten {
 
     /** Kleinster Drehwinkel, der als Ausrichtung gezählt wird. */
     public static final double AUSR_MIN_WINKEL = Math.toRadians(1.0);
+
+    /**
+     * Größte Winkelabweichung zwischen Blickrichtung und Wandrichtung, bei der beim Loslaufen mit seitlichem
+     * Wandkontakt automatisch parallel ausgerichtet wird (Konzept Abschnitt 7.5).
+     */
+    public static final double AUSR_AUTO_MAX_WINKEL = Math.toRadians(20.0);
 
     /** Horizontaler Abstand zur nächsten Fläche, ab dem die Wandführung endet (sofern kein Handkontakt). */
     public static final double LOCK_RELEASE_DIST = 1.0;

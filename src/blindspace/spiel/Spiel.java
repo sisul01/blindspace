@@ -20,9 +20,9 @@ import java.util.Random;
  *
  * <p>
  * Die Simulation läuft in festen Zeitschritten ({@code SIM_DT}). {@link #schritt(double)} legt die
- * Reihenfolge eines Schritts fest: Ausrichtungswunsch abholen, Körper bewegen, Kollision melden, Hände
- * bewegen, Handstopp prüfen, Tastpunkte und Tastereignisse erzeugen, Ausrichtung aktualisieren,
- * Tastpunkte altern lassen.
+ * Reihenfolge eines Schritts fest: Ausrichtungswunsch abholen, Körper bewegen, bei Schrittbeginn automatisch
+ * parallel ausrichten, Kollision melden, Hände bewegen, Handstopp prüfen, Tastpunkte und Tastereignisse
+ * erzeugen, Ausrichtung aktualisieren, Tastpunkte altern lassen.
  * </p>
  */
 public final class Spiel {
@@ -194,6 +194,10 @@ public final class Spiel {
         boolean ausrichtenWunsch = eingabe.ausrichten;
         eingabe.ausrichten = false;
         koerper.update(dt, eingabe, welt, ausrichtung.wandfuehrung(), vorneBlockiert());
+        if (koerper.holeSchrittBeginn()) {
+            // Loslaufen mit seitlichem Wandkontakt: bei höchstens 20° Abweichung automatisch parallel ausrichten
+            ausrichtung.beiSchrittBeginn(koerper, haende);
+        }
         Welt.Kollision stoss = koerper.holeKollision();
         if (stoss != null) {
             // Kollisionsereignis: erst alle vorhandenen Visualisierungen dämpfen, dann den Kollisionspunkt

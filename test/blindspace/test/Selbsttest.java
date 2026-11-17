@@ -42,13 +42,15 @@ public final class Selbsttest {
         startpose();
         gehenBisWand();
         kollisionDannDuckenUndTasten();
-        gehenNurAufrecht();
+        duckschritte();
+        tastbandBisBoden();
         koerperteile();
         oberflaechen();
         einzelUndVollschritt();
         zufallsStart();
         handLoesenUndGleiten();
         seitlichesTastenStopptNichtUndRichtetAus();
+        autoAusrichtungGrenzen();
         ausrichtungSenkrechtUndParallel();
         ausrichtungNurMitMoeglichkeit();
         ausrichtungKriterien();
@@ -294,23 +296,90 @@ public final class Selbsttest {
         }
         pruefe(s.koerper.stufe() == 3, "Körperstufe 4");
         pruefe(kisteGetastet, "Kiste wurde im Hocken ertastet (halber Schritt reicht für die Handreichweite)");
-        // Gehen ist geduckt nicht erlaubt
-        double y0 = s.koerper.y;
+        // Geduckt: Einzelschritte von 10 cm vorwärts (die Hände liegen auf der Kiste) und rückwärts
+        double vx = s.koerper.x, vy = s.koerper.y;
         s.eingabe.vor = true;
         lauf(s, 1.0);
-        pruefe(Math.abs(s.koerper.y - y0) < 1e-9, "geduckt ist Gehen gesperrt");
+        double vor = Math.hypot(s.koerper.x - vx, s.koerper.y - vy);
+        pruefe(Math.abs(vor - DUCK_SCHRITT) < 0.005 && s.koerper.kollisionen() == 1,
+                "geduckt: vorwärts ein Einzelschritt von 10 cm (" + String.format("%.3f", vor) + " m), keine Kollision");
+        s.eingabe.vor = false;
+        lauf(s, 0.1);
+        double rx = s.koerper.x, ry = s.koerper.y;
+        s.eingabe.rueck = true;
+        lauf(s, 1.0);
+        double weg = Math.hypot(s.koerper.x - rx, s.koerper.y - ry);
+        pruefe(Math.abs(weg - DUCK_SCHRITT) < 0.005, "geduckt: rückwärts ein Einzelschritt von 10 cm ("
+                + String.format("%.3f", weg) + " m)");
     }
 
     /**
-     * Prüft, dass Gehen nur aufrecht möglich ist, Drehen aber in jeder Körperstufe.
+     * Prüft die Einzelschritte von 10 cm in geduckter Haltung (vorwärts und rückwärts, kein Wiederholen bei
+     * gehaltener Taste, kein Gehen-Modus, keine Drift) und dass Drehen in jeder Körperstufe möglich bleibt.
      */
-    static void gehenNurAufrecht() {
-        titel("Gehen nur aufrecht (Abschnitt 4.3)");
+    static void duckschritte() {
+        titel("Geduckt: Einzelschritte von 10 cm, Drehen bleibt möglich (Abschnitte 4.3, 5)");
         Spiel s = new Spiel(4);
         s.eingabe.stufeWunsch = 1;
+        lauf(s, 0.5);
+        double y0 = s.koerper.y;
         s.eingabe.vor = true;
+        lauf(s, 0.03);
+        pruefe(s.koerper.schrittAktiv() && !s.koerper.gehen(), "Duckschritt läuft und gilt als Stehen (nicht als Gehen)");
         lauf(s, 1.5);
-        pruefe(Math.abs(s.koerper.y - s.level().startY()) < 1e-9, "Stufe 70 cm: keine Bewegung");
+        pruefe(Math.abs(s.koerper.y - y0 - DUCK_SCHRITT) < 0.005, "Stufe 70 cm, Taste gehalten: genau ein Schritt von 10 cm ("
+                + String.format("%.3f", s.koerper.y - y0) + " m)");
+        pruefe(s.koerper.schrittZaehler() == 0, "Duckschritte zählen nicht für die Drift");
+        s.eingabe.vor = false;
+        lauf(s, 0.1);
+        s.eingabe.vor = true;
+        lauf(s, 0.5);
+        pruefe(Math.abs(s.koerper.y - y0 - 2 * DUCK_SCHRITT) < 0.005, "erneuter Tastendruck: weiterer Schritt von 10 cm");
+        s.eingabe.vor = false;
+        lauf(s, 0.1);
+        s.eingabe.rueck = true;
+        lauf(s, 0.5);
+        pruefe(Math.abs(s.koerper.y - y0 - DUCK_SCHRITT) < 0.005, "rückwärts: Schritt von 10 cm");
+        s.eingabe.rueck = false;
+        lauf(s, 0.1);
+        s.eingabe.stufeWunsch = 3;
+        lauf(s, 0.5);
+        double y1 = s.koerper.y;
+        s.eingabe.rueck = true;
+        lauf(s, 1.5);
+        pruefe(s.koerper.stufe() == 3 && Math.abs(y1 - s.koerper.y - DUCK_SCHRITT) < 0.005,
+                "Stufe 30 cm: ebenfalls 10 cm, gehaltene Taste wiederholt nicht");
+        s.eingabe.rueck = false;
+        lauf(s, 0.1);
+        s.eingabe.stufeWunsch = 0;
+        lauf(s, 0.5);
+        double y2 = s.koerper.y;
+        s.eingabe.vor = true;
+        lauf(s, 0.05);
+        s.eingabe.vor = false;
+        lauf(s, 1.0);
+        pruefe(Math.abs(s.koerper.y - y2 - HALBSCHRITT) < 0.01, "aufrecht bleibt der Einzeldruck ein Halbschritt (25 cm)");
+        // Vordere Hand an der Ostwand: Der Duckschritt vorwärts ist blockiert, rückwärts möglich
+        Spiel w = new Spiel(43);
+        w.koerper.x = 5.3;
+        w.koerper.y = -4.0;
+        w.koerper.kurs = -Math.PI / 2; // Blick nach Osten zur Wand
+        w.eingabe.stufeWunsch = 1;
+        w.eingabe.mausBewegt = true;
+        w.eingabe.mausV = 0.5;
+        lauf(w, 1.5);
+        pruefe(w.haende.links.kontakt != null && w.haende.rechts.kontakt != null, "Aufbau: beide Hände berühren die Wand");
+        double wx = w.koerper.x;
+        w.eingabe.vor = true;
+        lauf(w, 1.0);
+        pruefe(Math.abs(w.koerper.x - wx) < 1e-9, "geduckt: die vordere Hand an der Wand blockiert den Schritt vorwärts");
+        w.eingabe.vor = false;
+        lauf(w, 0.1);
+        w.eingabe.rueck = true;
+        lauf(w, 1.0);
+        pruefe(Math.abs(wx - w.koerper.x - DUCK_SCHRITT) < 0.005, "geduckt: rückwärts von der Wand weg ein Schritt von 10 cm");
+        s.eingabe.stufeWunsch = 1;
+        lauf(s, 0.3);
         s.eingabe.links = true;
         lauf(s, 0.1);
         s.eingabe.links = false;
@@ -318,6 +387,90 @@ public final class Selbsttest {
         double d = Math.abs(Koerper.normalisiere(s.koerper.kurs));
         pruefe(Math.abs(d - Math.toRadians(15)) <= Math.toRadians(1) + 1e-9,
                 "Drehen geduckt möglich: " + String.format("%.1f", Math.toDegrees(d)) + "°");
+    }
+
+    /**
+     * Erzeugt ein Level mit zwei Stufen (18 und 36 cm) ohne Außenwände, Start bei (0 | 0,15), Blick nach Norden.
+     *
+     * @return Level mit zwei Stufenquadern "Stufe 1" (ID 1) und "Stufe 2" (ID 2)
+     */
+    static Level stufenLevel() {
+        return new Level() {
+            @Override
+            public String name() {
+                return "Stufen";
+            }
+
+            @Override
+            public Welt erzeuge() {
+                Welt w = new Welt();
+                w.add("Stufe 1", Objektart.TREPPE, Oberflaeche.RAU, -1.0, 0.9, 1.0, 1.2, 0.18);
+                w.add("Stufe 2", Objektart.TREPPE, Oberflaeche.RAU, -1.0, 1.2, 1.0, 1.5, 0.36);
+                return w;
+            }
+
+            @Override
+            public double startX() {
+                return 0;
+            }
+
+            @Override
+            public double startY() {
+                return 0.15;
+            }
+
+            @Override
+            public double startKurs() {
+                return 0;
+            }
+        };
+    }
+
+    /**
+     * Prüft das Tastband bis knapp über den Boden: Stufen sind geduckt ertastbar, der Boden und flache
+     * Gegenstände nicht, das Maximum bleibt bei 180 cm.
+     */
+    static void tastbandBisBoden() {
+        titel("Tastband bis knapp über dem Boden: Stufen ertastbar, Boden nicht (Abschnitt 4.3)");
+        pruefe(Math.abs(bandUnten(false, 3) - TAST_MIN_HOEHE) < 1e-12 && TAST_MIN_HOEHE > 0 && TAST_MIN_HOEHE <= 0.10,
+                "tiefstes Band beginnt knapp über dem Boden (" + Math.round(TAST_MIN_HOEHE * 100) + " cm)");
+        pruefe(Math.abs(bandOben(false, 0) - 1.80) < 1e-12, "Maximum bleibt 180 cm");
+        pruefe(bandOben(false, 3) == 0.60 && bandUnten(false, 2) == 0.60 && bandUnten(false, 0) == 1.40,
+                "übrige Bänder unverändert");
+
+        Welt w = new Welt();
+        w.add("Teppich", -1, 0, 1, 1, 0.01);
+        pruefe(w.sondiere(0, 0.5, TAST_MIN_HOEHE, SUCHRADIUS_STEHEN, false) == null,
+                "flacher Gegenstand (1 cm) liegt unter dem Tastband: nicht ertastbar");
+        pruefe(w.sondiere(0, 5.0, TAST_MIN_HOEHE, SUCHRADIUS_STEHEN, false) == null,
+                "Boden wird von den Händen nie ertastet");
+        Beruehrung boden = w.sondiere(0, 5.0, TAST_MIN_HOEHE, 0.1);
+        pruefe(boden != null && boden.objektId() == Welt.BODEN_ID, "die Tastprobe der Welt kennt den Boden weiterhin");
+
+        Spiel s = new Spiel(40, stufenLevel());
+        s.eingabe.stufeWunsch = 3;
+        s.eingabe.mausBewegt = true;
+        s.eingabe.mausU = 0.5;
+        s.eingabe.mausV = 0.2; // z = 5 + 0,2 * 55 = 16 cm
+        lauf(s, 2.0);
+        boolean stufe = false;
+        for (Tastpunkt p : s.tastpunkte.alle()) {
+            stufe |= p.objektId == 1;
+        }
+        pruefe(stufe && s.koerper.kollisionen() == 0, "Stufe (18 cm) wird geduckt (30 cm) ertastet");
+        Spiel a = new Spiel(41, stufenLevel());
+        a.eingabe.mausBewegt = true;
+        a.eingabe.mausV = 0.5;
+        lauf(a, 2.0);
+        pruefe(a.tastpunkte.anzahl() == 0, "aufrecht: Stufe unterhalb des Tastbands, kein Kontakt");
+        Spiel b = new Spiel(42, stufenLevel());
+        b.eingabe.stufeWunsch = 3;
+        b.eingabe.mausBewegt = true;
+        b.eingabe.mausV = 0.0; // tiefste Handhöhe
+        b.koerper.y = -2.0;
+        lauf(b, 2.0);
+        pruefe(b.tastpunkte.anzahl() == 0 && b.haende.links.kontakt == null && b.haende.rechts.kontakt == null,
+                "tiefste Handhöhe ohne Objekt: auch nach 2 s kein Kontakt mit dem Boden");
     }
 
     /**
@@ -347,11 +500,11 @@ public final class Selbsttest {
     }
 
     /**
-     * Prüft, dass seitlicher Handkontakt den Körper nicht stoppt, die Wandführung startet und die Leertaste
-     * danach parallel ausrichtet.
+     * Prüft, dass seitlicher Handkontakt den Körper nicht stoppt, beim Loslaufen automatisch parallel
+     * ausgerichtet wird (Abweichung höchstens 20 Grad) und die Wandführung beginnt.
      */
     static void seitlichesTastenStopptNichtUndRichtetAus() {
-        titel("Seitliches Tasten im Gehen: Körper läuft weiter, Ausrichtung nur auf Tastendruck (Abschnitte 4.5, 7)");
+        titel("Seitliches Tasten im Gehen: Körper läuft weiter und richtet beim Loslaufen automatisch parallel aus (Abschnitte 4.5, 7.5)");
         Spiel s = new Spiel(6);
         s.koerper.x = 5.3;
         s.koerper.y = -4.0;
@@ -368,14 +521,120 @@ public final class Selbsttest {
         s.eingabe.vor = false;
         lauf(s, 1.5);
         pruefe(s.ausrichtung.moeglich(), "Ausrichtung möglich (gültiges Tastpaar)");
-        pruefe(s.ausrichtung.wandfuehrung(), "Wandführung bereits ohne Ausrichtung aktiv");
-        pruefe(s.ausrichtung.anzahl() == 0, "keine automatische Ausrichtung");
-        pruefe(Math.abs(Koerper.normalisiere(s.koerper.kurs + 0.10)) < 1e-6, "Kurs unverändert");
-        s.eingabe.ausrichten = true;
-        lauf(s, 1.0);
-        pruefe(s.ausrichtung.anzahl() == 1, "genau eine Ausrichtung nach Tastendruck");
+        pruefe(s.ausrichtung.wandfuehrung(), "Wandführung aktiv");
+        pruefe(s.ausrichtung.anzahl() == 1, "genau eine automatische Ausrichtung beim Loslaufen");
         pruefe(Math.abs(Koerper.normalisiere(s.koerper.kurs)) < Math.toRadians(1.0),
                 "parallel zur Wand (Blick nach Norden): " + String.format("%.2f", Math.toDegrees(s.koerper.kurs)) + "°");
+        s.eingabe.ausrichten = true;
+        lauf(s, 1.0);
+        pruefe(s.ausrichtung.anzahl() == 1, "Leertaste danach: Drehung unter 1 Grad, nicht erneut gezählt");
+    }
+
+    /**
+     * Erzeugt einen Spiel-Aufbau mit der rechten Hand (seitlich tastend) an der Ostwand des Testlevels.
+     *
+     * @param seed       Startwert des Zufallsgenerators
+     * @param kurs       Startblickrichtung in Radiant
+     * @param stufe      gewünschte Körperstufe 0 bis 3
+     * @param mausV      Handhöhe im Tastband (0 bis 1)
+     * @param y          Start-Y-Position (x ist 5,3)
+     * @return das Spiel nach 1 s Stillstand; die Hand klebt dann an der Wand
+     */
+    static Spiel seitenhandAnOstwand(long seed, double kurs, int stufe, double mausV, double y) {
+        Spiel s = new Spiel(seed);
+        s.koerper.x = 5.3;
+        s.koerper.y = y;
+        s.koerper.kurs = kurs;
+        s.eingabe.stufeWunsch = stufe;
+        s.eingabe.mausBewegt = true;
+        s.eingabe.mausRechts = true;
+        s.eingabe.mausV = mausV;
+        lauf(s, 1.0);
+        return s;
+    }
+
+    /**
+     * Prüft die automatische Parallelausrichtung: nur beim Loslaufen, nur bis 20 Grad Abweichung, nur mit
+     * seitlichem Kontakt an einer senkrechten Fläche, auch rückwärts, nicht bei Duckschritten und nicht während
+     * einer Drehung.
+     */
+    static void autoAusrichtungGrenzen() {
+        titel("Automatische Parallelausrichtung: Bedingungen und Grenzen (Abschnitt 7.5)");
+        Spiel a = seitenhandAnOstwand(50, -0.30, 0, 0.5, -4.0); // 17,2° zur Wand
+        pruefe(a.haende.rechts.haelt, "Aufbau: rechte Hand klebt an der Ostwand");
+        pruefe(a.ausrichtung.anzahl() == 0 && Math.abs(a.koerper.kurs + 0.30) < 1e-9,
+                "im Stehen (ohne Loslaufen) keine automatische Ausrichtung");
+        a.eingabe.vor = true;
+        lauf(a, 1.0);
+        pruefe(Math.abs(Koerper.normalisiere(a.koerper.kurs)) < Math.toRadians(1.0) && a.ausrichtung.anzahl() == 1
+                && a.ausrichtung.wandfuehrung(), "Loslaufen bei 17°: parallel ausgerichtet, Wandführung an");
+
+        Spiel b = seitenhandAnOstwand(51, -0.44, 0, 0.5, -4.0); // 25,2° zur Wand
+        b.eingabe.vor = true;
+        lauf(b, 0.1);
+        b.eingabe.vor = false;
+        lauf(b, 0.8);
+        pruefe(b.ausrichtung.anzahl() == 0 && Math.abs(b.koerper.kurs + 0.44) < 1e-9 && b.koerper.kollisionen() == 0,
+                "Loslaufen bei 25°: keine automatische Ausrichtung, Blickrichtung unverändert");
+
+        Spiel r = seitenhandAnOstwand(52, -0.30, 0, 0.5, -2.0);
+        double yr = r.koerper.y;
+        r.eingabe.rueck = true;
+        lauf(r, 1.0);
+        pruefe(Math.abs(Koerper.normalisiere(r.koerper.kurs)) < Math.toRadians(1.0) && r.koerper.y < yr - 0.5
+                && r.ausrichtung.anzahl() == 1, "auch beim Rückwärtsgehen: parallel ausgerichtet");
+
+        Spiel d = seitenhandAnOstwand(53, -0.30, 1, 0.5, -4.0);
+        pruefe(d.haende.rechts.haelt && d.koerper.stufe() == 1, "Aufbau geduckt (70 cm): Hand klebt an der Wand");
+        d.eingabe.vor = true;
+        lauf(d, 1.0);
+        pruefe(d.ausrichtung.anzahl() == 0 && Math.abs(d.koerper.kurs + 0.30) < 1e-9,
+                "Duckschritte richten nicht automatisch aus");
+
+        // Grenzwerte direkt an der Ausrichtung, mit künstlichem Handkontakt an einer Wand mit Normale -X
+        Beruehrung wand = new Beruehrung(5, 0, -1, 6.0, 0.0, 1.5, 0.0, Oberflaeche.RAU, Objektart.WAND);
+        Spiel g1 = new Spiel(54, leeresLevel());
+        g1.haende.rechts.seitlich = true;
+        g1.haende.rechts.kontakt = wand;
+        g1.koerper.kurs = Math.toRadians(19.5);
+        pruefe(g1.ausrichtung.beiSchrittBeginn(g1.koerper, g1.haende) && g1.koerper.drehAktiv(),
+                "19,5° Abweichung: Ausrichtung beginnt");
+        lauf(g1, 0.5);
+        pruefe(Math.abs(g1.koerper.kurs) < 1e-6, "Ziel: Wandrichtung Norden");
+
+        Spiel g2 = new Spiel(55, leeresLevel());
+        g2.haende.rechts.seitlich = true;
+        g2.haende.rechts.kontakt = wand;
+        g2.koerper.kurs = Math.toRadians(20.5);
+        pruefe(!g2.ausrichtung.beiSchrittBeginn(g2.koerper, g2.haende) && !g2.koerper.drehAktiv()
+                && !g2.ausrichtung.wandfuehrung() && g2.ausrichtung.anzahl() == 0, "20,5° Abweichung: nichts geschieht");
+
+        Spiel g3 = new Spiel(56, leeresLevel());
+        g3.haende.rechts.seitlich = true;
+        g3.haende.rechts.kontakt = wand;
+        g3.koerper.kurs = Math.PI - 0.2; // fast nach Süden: der kleinere Drehwinkel führt nach Süden
+        g3.ausrichtung.beiSchrittBeginn(g3.koerper, g3.haende);
+        lauf(g3, 0.5);
+        pruefe(Math.abs(Math.abs(g3.koerper.kurs) - Math.PI) < 1e-6, "kleinerer Drehwinkel: Ausrichtung nach Süden");
+
+        Spiel g4 = new Spiel(57, leeresLevel());
+        g4.haende.rechts.seitlich = false; // Hand tastet nach vorn
+        g4.haende.rechts.kontakt = wand;
+        g4.koerper.kurs = 0.1;
+        pruefe(!g4.ausrichtung.beiSchrittBeginn(g4.koerper, g4.haende), "Tasten nach vorn richtet nicht automatisch aus");
+
+        Spiel g5 = new Spiel(58, leeresLevel());
+        g5.haende.rechts.seitlich = true;
+        g5.haende.rechts.kontakt = new Beruehrung(5, 2, 1, 6.0, 0.0, 0.5, 0.0, Oberflaeche.RAU, Objektart.SONSTIGES);
+        g5.koerper.kurs = 0.1;
+        pruefe(!g5.ausrichtung.beiSchrittBeginn(g5.koerper, g5.haende), "Oberseiten werden nicht ausgerichtet");
+
+        Spiel g6 = new Spiel(59, leeresLevel());
+        g6.haende.rechts.seitlich = true;
+        g6.haende.rechts.kontakt = wand;
+        g6.koerper.kurs = 0.1;
+        g6.koerper.drehe(0.2);
+        pruefe(!g6.ausrichtung.beiSchrittBeginn(g6.koerper, g6.haende), "während einer Drehung keine automatische Ausrichtung");
     }
 
     /**

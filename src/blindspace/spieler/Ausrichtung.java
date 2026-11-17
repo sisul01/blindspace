@@ -2,6 +2,7 @@ package blindspace.spieler;
 
 import static blindspace.konfig.Konstanten.*;
 
+import blindspace.welt.Beruehrung;
 import blindspace.welt.Welt;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +17,12 @@ import java.util.List;
  * Wandführung (die Zufallsdrift ist aus), und eine Ausrichtung ist für 20 s <em>möglich</em>. Ausgeführt wird sie
  * nur auf Wunsch des Spielers (Leertaste oder Num 0): seitliches Tasten richtet parallel zur Fläche aus, Tasten
  * nach vorn senkrecht.
+ * </p>
+ *
+ * <p>
+ * Zusätzlich richtet der Körper beim Loslaufen automatisch parallel aus, wenn eine seitlich tastende Hand an
+ * einer senkrechten Fläche Kontakt hat und die Blickrichtung höchstens 20° von der Flächenrichtung abweicht
+ * (Abschnitt 7.5, {@link #beiSchrittBeginn}).
  * </p>
  */
 public final class Ausrichtung {
@@ -172,6 +179,28 @@ public final class Ausrichtung {
     }
 
     /**
+     * Berechnet die Zielrichtung für eine Ausrichtung an einer senkrechten Fläche.
+     *
+     * @param achse      Achse der Fläche (0 = X, 1 = Y)
+     * @param vorzeichen Vorzeichen der Flächennormalen
+     * @param senkrecht  true: Front zur Fläche; false: parallel zur Fläche (kleinerer Drehwinkel)
+     * @param kurs       aktuelle Blickrichtung des Körpers
+     * @return Zielblickrichtung in Radiant
+     */
+    private static double zielKurs(int achse, int vorzeichen, boolean senkrecht, double kurs) {
+        double nx = achse == 0 ? vorzeichen : 0;
+        double ny = achse == 1 ? vorzeichen : 0;
+        if (senkrecht) {
+            return winkelVon(-nx, -ny); // Front zur Fläche
+        }
+        double a1 = winkelVon(-ny, nx);
+        double a2 = winkelVon(ny, -nx);
+        double d1 = Math.abs(Koerper.normalisiere(a1 - kurs));
+        double d2 = Math.abs(Koerper.normalisiere(a2 - kurs));
+        return d1 <= d2 ? a1 : a2;
+    }
+
+    /**
      * Führt die Ausrichtung aus: berechnet die Zielrichtung (senkrecht oder parallel mit dem kleineren
      * Drehwinkel), dreht den Körper animiert, zählt die Ausrichtung (ab 1 Grad Drehung) und schaltet die
      * Wandführung ein.
@@ -179,23 +208,50 @@ public final class Ausrichtung {
      * @param k Körper, der ausgerichtet wird
      */
     private void fuehreAus(Koerper k) {
-        double nx = vormerkung.achse() == 0 ? vormerkung.vorzeichen() : 0;
-        double ny = vormerkung.achse() == 1 ? vormerkung.vorzeichen() : 0;
-        double ziel;
-        if (vormerkung.senkrecht()) {
-            ziel = winkelVon(-nx, -ny); // Front zur Fläche
-        } else {
-            double a1 = winkelVon(-ny, nx);
-            double a2 = winkelVon(ny, -nx);
-            double d1 = Math.abs(Koerper.normalisiere(a1 - k.kurs));
-            double d2 = Math.abs(Koerper.normalisiere(a2 - k.kurs));
-            ziel = d1 <= d2 ? a1 : a2;
-        }
+        double ziel = zielKurs(vormerkung.achse(), vormerkung.vorzeichen(), vormerkung.senkrecht(), k.kurs);
         double delta = Koerper.normalisiere(ziel - k.kurs);
         if (Math.abs(delta) >= AUSR_MIN_WINKEL) {
             k.drehe(delta);
             anzahl++;
         }
         wandfuehrung = true;
+    }
+
+    /**
+     * Automatische Parallelausrichtung beim Loslaufen (Konzept Abschnitt 7.5). Wird aufgerufen, wenn ein
+     * aufrechter Schritt beginnt. Hat eine seitlich tastende Hand Kontakt mit einer senkrechten Fläche und
+     * weicht die Blickrichtung höchstens um {@code AUSR_AUTO_MAX_WINKEL} (20°) von der Richtung der Fläche ab,
+     * dreht sich der Körper animiert parallel dazu (kleinerer Drehwinkel), die Wandführung beginnt, und die
+     * Drift des soeben begonnenen Schritts entfällt. Bei größerer Abweichung, ohne seitlichen Kontakt, bei
+     * Kontakt mit einer Oberseite oder während einer laufenden Drehung geschieht nichts. Eine Drehung ab
+     * {@code AUSR_MIN_WINKEL} (1°) wird wie eine manuelle Ausrichtung gezählt.
+     *
+     * @param k Körper (wird gedreht)
+     * @param h Hände (Kontakt und Tastrichtung)
+     * @return true, wenn die Wandführung durch diese Ausrichtung eingeschaltet wurde
+     */
+    public boolean beiSchrittBeginn(Koerper k, Haende h) {
+        if (k.drehAktiv()) {
+            return false;
+        }
+        for (Haende.Hand hand : h.alle()) {
+            Beruehrung b = hand.kontakt;
+            if (!hand.seitlich || b == null || b.achse() == 2) {
+                continue;
+            }
+            double ziel = zielKurs(b.achse(), b.vorzeichen(), false, k.kurs);
+            double delta = Koerper.normalisiere(ziel - k.kurs);
+            if (Math.abs(delta) > AUSR_AUTO_MAX_WINKEL) {
+                continue;
+            }
+            if (Math.abs(delta) >= AUSR_MIN_WINKEL) {
+                k.drehe(delta);
+                anzahl++;
+            }
+            k.verwirfDrift();
+            wandfuehrung = true;
+            return true;
+        }
+        return false;
     }
 }

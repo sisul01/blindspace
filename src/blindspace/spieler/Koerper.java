@@ -10,7 +10,9 @@ import java.util.Random;
  *
  * <p>
  * Schritte: Bei gehaltener Taste folgen Vollschritte (0,5 m) bis zum Loslassen; ein kurzer Tastendruck
- * (Taste vor Erreichen des halben Schritts losgelassen) ergibt einen Halbschritt (0,25 m).
+ * (Taste vor Erreichen des halben Schritts losgelassen) ergibt einen Halbschritt (0,25 m). Geduckt (Körperstufen
+ * 2 bis 4) gibt es nur Einzelschritte von 10 cm vorwärts und rückwärts: Jeder Tastendruck ergibt genau einen
+ * Schritt, gehalten wird nicht wiederholt, und es gibt weder Drift noch den Modus „Gehen“.
  * Die Klasse verwaltet Position, Blickrichtung, Körperstufe (Ducken), Schritte, Drehungen, die Zufallsdrift,
  * den Gehen/Stehen-Modus sowie Körperkollisionen mit Rückstoß und Eingabesperre. Sie kennt nur die Welt für
  * die Kollisionsprüfung; Hände und Tastpunkte werden von {@code blindspace.spiel.Spiel} koordiniert.
@@ -58,6 +60,12 @@ public final class Koerper {
     /** Ein weiterer Schritt folgt bei gehaltener Taste auf einen vollendeten Schritt (kein Einzeldruck). */
     private boolean schrittFolge;
 
+    /** Der laufende Schritt ist ein Duckschritt von {@code DUCK_SCHRITT} (nur geduckt gestartet). */
+    private boolean schrittKurz;
+
+    /** Ein aufrechter Schritt hat in diesem Simulationsschritt begonnen und wurde noch nicht abgeholt. */
+    private boolean schrittBegonnen;
+
     /** Gesamte Driftdrehung des laufenden Schritts in Radiant. */
     private double schrittDrift;
 
@@ -100,7 +108,10 @@ public final class Koerper {
     /** Restzeit des Gehen-Nachlaufs. */
     private double nachlauf;
 
-    /** Gehsperre nach einem Handstopp: Die Gehtaste muss losgelassen und neu gedrückt werden. */
+    /**
+     * Gehsperre nach einem Handstopp oder einem Duckschritt: Die Gehtaste muss losgelassen und neu gedrückt
+     * werden.
+     */
     private boolean gehSperre;
 
     /**
@@ -224,7 +235,28 @@ public final class Koerper {
         return k;
     }
 
+    /**
+     * Meldet jeden begonnenen aufrechten Schritt (Vollschritt oder Halbschritt, vorwärts oder rückwärts)
+     * genau einmal. Duckschritte werden nicht gemeldet. Das Spiel nutzt die Meldung für die automatische
+     * Parallelausrichtung an einer Wand (Konzept Abschnitt 7.5).
+     *
+     * @return true, wenn seit dem letzten Aufruf ein aufrechter Schritt begonnen hat
+     */
+    public boolean holeSchrittBeginn() {
+        boolean b = schrittBegonnen;
+        schrittBegonnen = false;
+        return b;
+    }
+
     // ===== Aktionen =====
+
+    /**
+     * Verwirft die Driftdrehung des laufenden Schritts. Wird aufgerufen, wenn die Wandführung mit diesem Schritt
+     * beginnt, damit der Körper nicht gleich wieder von der Wand wegdriftet.
+     */
+    public void verwirfDrift() {
+        schrittDrift = 0;
+    }
 
     /**
      * Bricht den laufenden Schritt ab, weil eine nach vorn tastende Hand eine Fläche berührt (Konzept 4.5).
@@ -300,6 +332,7 @@ public final class Koerper {
 
         boolean gesperrt = sperre > 0;
         boolean aufrecht = stufe == 0;
+        schrittBegonnen = false;
         int richtung = (in.vor ? 1 : 0) - (in.rueck ? 1 : 0);
         if (vorneBlockiert && richtung > 0) {
             if (schrittAktiv && schrittRichtung > 0) {
@@ -308,18 +341,26 @@ public final class Koerper {
             gehSperre = true;
         }
 
-        // Schritt starten
-        if (!gesperrt && aufrecht && !schrittAktiv && rueckstossRest <= 0 && !gehSperre && richtung != 0) {
+        // Schritt starten: aufrecht Voll- oder Halbschritt, geduckt ein Einzelschritt von 10 cm
+        if (!gesperrt && !schrittAktiv && rueckstossRest <= 0 && !gehSperre && richtung != 0) {
             schrittAktiv = true;
-            schrittRest = SCHRITTLAENGE;
             schrittRichtung = richtung;
-            schrittGekuerzt = schrittFolge; // nur der erste Schritt eines Tastendrucks kann ein Halbschritt sein
             schrittDrift = 0;
-            if (!wandfuehrung) {
-                if (schrittZaehler >= DRIFT_START_SCHRITTE) {
-                    schrittDrift = driftSeite * (DRIFT_MIN + zufall.nextDouble() * (DRIFT_MAX - DRIFT_MIN));
+            schrittKurz = !aufrecht;
+            if (schrittKurz) {
+                // Duckschritt: feste Länge, kein Halbschritt, keine Drift (zählt nicht für die Drift)
+                schrittRest = DUCK_SCHRITT;
+                schrittGekuerzt = true;
+            } else {
+                schrittRest = SCHRITTLAENGE;
+                schrittGekuerzt = schrittFolge; // nur der erste Schritt eines Tastendrucks kann ein Halbschritt sein
+                schrittBegonnen = true;
+                if (!wandfuehrung) {
+                    if (schrittZaehler >= DRIFT_START_SCHRITTE) {
+                        schrittDrift = driftSeite * (DRIFT_MIN + zufall.nextDouble() * (DRIFT_MAX - DRIFT_MIN));
+                    }
+                    schrittZaehler++;
                 }
-                schrittZaehler++;
             }
         }
         // Drehung starten
@@ -370,7 +411,11 @@ public final class Koerper {
                 schrittRest -= d;
                 if (schrittRest <= 1e-9) {
                     schrittAktiv = false;
-                    schrittFolge = true;
+                    if (schrittKurz) {
+                        gehSperre = true; // Duckschritt wird bei gehaltener Taste nicht wiederholt
+                    } else {
+                        schrittFolge = true;
+                    }
                 }
             }
         }
@@ -391,12 +436,12 @@ public final class Koerper {
 
         // Gehen/Stehen (mit Nachlauf gegen Flackern)
         boolean tasteGehen = aufrecht && !gesperrt && !gehSperre && richtung != 0;
-        if (schrittAktiv || tasteGehen) {
+        if ((schrittAktiv && !schrittKurz) || tasteGehen) {
             nachlauf = GEHEN_NACHLAUF;
         } else {
             nachlauf = Math.max(0, nachlauf - dt);
         }
-        gehen = aufrecht && (schrittAktiv || tasteGehen || nachlauf > 0);
+        gehen = aufrecht && ((schrittAktiv && !schrittKurz) || tasteGehen || nachlauf > 0);
 
         // Augenhöhe weich nachführen (nur Darstellung)
         double zielZ = BEIN_HOEHEN[stufe] + AUGEN_OFFSET;
