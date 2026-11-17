@@ -1,7 +1,7 @@
 # Blindspace – Steuerungs- und Visualisierungsprototyp
 
 Blindes First-Person-Erkundungsspiel: Die Welt ist unsichtbar und wird nur durch Abtasten mit den Händen
-sichtbar. Umgesetzt ist das Konzept `docs/Blindspace_Konzept_v3.md` (Version 3.2). Java 17, AWT/Swing,
+sichtbar. Umgesetzt ist das Konzept `docs/Blindspace_Konzept_v3.md` (Version 3.4). Java 17, AWT/Swing,
 keine externen Abhängigkeiten.
 
 ## In Eclipse öffnen
@@ -34,12 +34,12 @@ Die Pakete sind in Schichten angeordnet; Abhängigkeiten gehen nur von oben nach
 | Paket | Klassen | Aufgabe |
 | --- | --- | --- |
 | `blindspace` | `Main` | Startpunkt: Fenster und Spielschleife |
-| `blindspace.anzeige` | `Ansicht`, `Muster` | Darstellung (Perspektive, Tastpunkt-Muster je Oberfläche, HUD, Debug-Karte) und Tastatur-/Maus-Listener |
+| `blindspace.anzeige` | `Ansicht`, `Muster` | Darstellung (Perspektive, Tastpunkt-Muster je Oberfläche, Kantenlinien, HUD, Debug-Karte) und Tastatur-/Maus-Listener |
 | `blindspace.spiel` | `Spiel` | Spielkern ohne GUI, feste Simulationsschleife (1/120 s), legt die Reihenfolge eines Schritts fest |
 | `blindspace.spieler` | `Eingabe`, `Koerper`, `Haende`, `Ausrichtung` | Eingabezustand, Körper (Schritte, Drehung, Drift, Kollision), gespiegelte Hände, manuelle Ausrichtung und Wandführung |
-| `blindspace.tasten` | `Tastpunkt`, `Tastpunkte`, `Verblassungsgruppe` (nutzt `welt.Oberflaeche`) | räumliches Gedächtnis: Kurzzeitpunkte (15 s/30 s), Langzeitgruppen (12 min), Kollisionsdämpfung |
+| `blindspace.tasten` | `Tastpunkt`, `Tastpunkte`, `Verblassungsgruppe`, `Tastkante` (nutzt `welt`) | räumliches Gedächtnis: Kurzzeitpunkte (15 s/30 s), Langzeitgruppen (12 min), ertastete Kantenstücke, Kollisionsdämpfung |
 | `blindspace.levels` | `Level`, `Testlevel` | Level-Schnittstelle (Welt und Startpose) und das Testlevel; weitere Levels kommen hier hinzu |
-| `blindspace.welt` | `Welt`, `Quader`, `Beruehrung`, `Koerperteil`, `Oberflaeche`, `Objektart` | unsichtbare AABB-Welt, Tastproben, 3D-Körperkollision |
+| `blindspace.welt` | `Welt`, `Quader`, `Beruehrung`, `Kantenstueck`, `Koerperteil`, `Oberflaeche`, `Objektart` | unsichtbare AABB-Welt, Tastproben, Kantenstücke zu einer Berührung, 3D-Körperkollision |
 | `blindspace.konfig` | `Konstanten` | alle Balancing-Werte an einer Stelle (Konzept Abschnitt 12) |
 
 ### Neues Level anlegen
@@ -51,7 +51,7 @@ Die Pakete sind in Schichten angeordnet; Abhängigkeiten gehen nur von oben nach
 ## Tests (`test/blindspace/test`, ohne JUnit, laufen ohne Fenster)
 
 - `Selbsttest` prüft die Kernregeln des Konzepts (Gedächtnis, Kollision, Ausrichtung, Wandführung, Drift ...).
-- `Bildtest` rendert Beispielbilder nach `docs/bilder`.
+- `Bildtest` rendert fünf Beispielbilder nach `docs/bilder` (Start, Wand, seitliches Tasten, Kiste geduckt, Kanten am Pfeiler).
 - `SpielMitKarte` startet das normal spielbare Spiel mit eingeblendeter Debug-Karte (F3 schaltet sie um).
 
 Alle per Rechtsklick -> *Run As -> Java Application* starten.

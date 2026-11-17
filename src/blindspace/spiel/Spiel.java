@@ -8,9 +8,11 @@ import blindspace.spieler.Ausrichtung;
 import blindspace.spieler.Eingabe;
 import blindspace.spieler.Haende;
 import blindspace.spieler.Koerper;
+import blindspace.tasten.Tastkante;
 import blindspace.tasten.Tastpunkt;
 import blindspace.tasten.Tastpunkte;
 import blindspace.welt.Beruehrung;
+import blindspace.welt.Kantenstueck;
 import blindspace.welt.Oberflaeche;
 import blindspace.welt.Welt;
 import java.util.Random;
@@ -21,8 +23,8 @@ import java.util.Random;
  * <p>
  * Die Simulation läuft in festen Zeitschritten ({@code SIM_DT}). {@link #schritt(double)} legt die
  * Reihenfolge eines Schritts fest: Ausrichtungswunsch abholen, Körper bewegen, bei Schrittbeginn automatisch
- * parallel ausrichten, Kollision melden, Hände bewegen, Handstopp prüfen, Tastpunkte und Tastereignisse
- * erzeugen, Ausrichtung aktualisieren, Tastpunkte altern lassen.
+ * parallel ausrichten, Kollision melden, Hände bewegen, Handstopp prüfen, Tastpunkte, Kantenstücke und
+ * Tastereignisse erzeugen, Ausrichtung aktualisieren, Tastpunkte altern lassen.
  * </p>
  */
 public final class Spiel {
@@ -213,7 +215,8 @@ public final class Spiel {
             koerper.stoppeSchritt();
         }
 
-        // Tastpunkte (höchstens einer pro Hand und 0,5 s) und Tastereignisse
+        // Tastpunkte (höchstens einer pro Hand und 0,5 s) und Tastereignisse; Kantenstücke bei jedem Schritt,
+        // damit eine über eine Kante streichende Hand sie nicht zwischen zwei Tastpunkten verpasst
         boolean gehen = koerper.gehen();
         boolean kontakt = false;
         for (Haende.Hand h : haende.alle()) {
@@ -222,6 +225,10 @@ public final class Spiel {
                 continue;
             }
             kontakt = true;
+            for (Kantenstueck ks : welt.kanten(h.kontakt, KANTE_TOLERANZ, KANTE_LAENGE)) {
+                tastpunkte.kante(new Tastkante(ks, zeit, gehen ? KANTE_HELLIGKEIT_GEHEN : KANTE_HELLIGKEIT_STEHEN,
+                        gehen ? KZ_DAUER_GEHEN : KZ_DAUER_STEHEN));
+            }
             if (h.tastTimer <= 0) {
                 Beruehrung b = h.kontakt;
                 tastpunkte.hinzufuegen(neuerPunkt(b.px(), b.py(), b.pz(), gehen, b.objektId(), b.oberflaeche()));

@@ -6,6 +6,7 @@ import blindspace.spiel.Spiel;
 import blindspace.spieler.Eingabe;
 import blindspace.spieler.Haende;
 import blindspace.spieler.Koerper;
+import blindspace.tasten.Tastkante;
 import blindspace.tasten.Tastpunkt;
 import blindspace.tasten.Verblassungsgruppe;
 import blindspace.welt.Quader;
@@ -26,6 +27,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import javax.swing.JPanel;
@@ -216,7 +218,7 @@ public final class Ansicht extends JPanel {
     }
 
     /**
-     * Zeichnet ein komplettes Bild: Tastpunkte, Hände, HUD und optional Debug-Karte und Hilfe. Auch ohne
+     * Zeichnet ein komplettes Bild: Tastpunkte, Kanten, Hände, HUD und optional Debug-Karte und Hilfe. Auch ohne
      * Fenster nutzbar (z. B. für Bildtests).
      *
      * @param g Grafikkontext
@@ -231,6 +233,7 @@ public final class Ansicht extends JPanel {
 
         Kamera cam = new Kamera(spiel.koerper, w, h);
         zeichnePunkte(g, cam);
+        zeichneKanten(g, cam);
         zeichneHaende(g, cam);
         zeichneHud(g, w, h);
         if (debugKarte) {
@@ -295,6 +298,93 @@ public final class Ansicht extends JPanel {
             }
             return new double[] { cx + f * xv / yv, cy - f * dz / yv, yv };
         }
+
+        /**
+         * Projiziert eine Strecke und kürzt sie an der Bildebene, wenn ein Ende hinter der Kamera liegt.
+         *
+         * @param ax X-Koordinate des Anfangs in der Welt
+         * @param ay Y-Koordinate des Anfangs in der Welt
+         * @param az Z-Koordinate des Anfangs in der Welt
+         * @param bx X-Koordinate des Endes in der Welt
+         * @param by Y-Koordinate des Endes in der Welt
+         * @param bz Z-Koordinate des Endes in der Welt
+         * @return {Anfang-X, Anfang-Y, Anfang-Tiefe, Ende-X, Ende-Y, Ende-Tiefe} auf dem Bildschirm oder
+         *         {@code null}, wenn die ganze Strecke hinter der Kamera liegt
+         */
+        double[] strecke(double ax, double ay, double az, double bx, double by, double bz) {
+            double[] p = kameraRaum(ax, ay, az);
+            double[] q = kameraRaum(bx, by, bz);
+            final double nah = 0.05;
+            if (p[1] < nah && q[1] < nah) {
+                return null;
+            }
+            if (p[1] < nah) {
+                p = schneide(p, q, nah);
+            } else if (q[1] < nah) {
+                q = schneide(q, p, nah);
+            }
+            return new double[] { cx + f * p[0] / p[1], cy - f * p[2] / p[1], p[1], cx + f * q[0] / q[1],
+                    cy - f * q[2] / q[1], q[1] };
+        }
+
+        /**
+         * Rechnet einen Weltpunkt in den Kameraraum um.
+         *
+         * @param wx X-Koordinate in der Welt
+         * @param wy Y-Koordinate in der Welt
+         * @param wz Z-Koordinate in der Welt
+         * @return {rechts, Tiefe, hoch} relativ zur Kamera in Metern
+         */
+        private double[] kameraRaum(double wx, double wy, double wz) {
+            double dx = wx - ex, dy = wy - ey, dz = wz - ez;
+            return new double[] { dx * c + dy * s, -dx * s + dy * c, dz };
+        }
+
+        /**
+         * Verschiebt einen Punkt hinter der Bildebene entlang der Strecke auf die Bildebene.
+         *
+         * @param hinten Punkt mit Tiefe unter {@code tiefe} (Kameraraum)
+         * @param vorn   Punkt mit Tiefe ab {@code tiefe} (Kameraraum)
+         * @param tiefe  Tiefe der Bildebene
+         * @return der Schnittpunkt der Strecke mit der Bildebene (Kameraraum)
+         */
+        private static double[] schneide(double[] hinten, double[] vorn, double tiefe) {
+            double t = (tiefe - hinten[1]) / (vorn[1] - hinten[1]);
+            return new double[] { hinten[0] + t * (vorn[0] - hinten[0]), tiefe,
+                    hinten[2] + t * (vorn[2] - hinten[2]) };
+        }
+    }
+
+    /**
+     * Zeichnet alle ertasteten Kantenstücke als schwarze Linien konstanter Breite ({@code KANTE_BREITE_PUNKTE}) über
+     * den Tastpunkten, als Kontrast zu den hellen Kugeln. Beim Verblassen verhält sich die Linie gegensätzlich zu den
+     * Kugeln: Je dunkler diese werden, desto heller wird die Linie (bis {@code KANTE_AUFHELLUNG_MAX}); unterhalb von
+     * {@code KANTE_AUSBLENDEN} der Starthelligkeit wird sie zusätzlich transparent und verschwindet.
+     *
+     * @param g   Grafikkontext
+     * @param cam Kamera
+     */
+    private void zeichneKanten(Graphics2D g, Kamera cam) {
+        double zeit = spiel.zeit();
+        g.setComposite(AlphaComposite.SrcOver);
+        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        g.setStroke(new BasicStroke((float) KANTE_BREITE_PUNKTE, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
+        for (Tastkante k : spiel.tastpunkte.kanten()) {
+            double rel = Math.min(1.0, k.helligkeit(zeit) / k.h0);
+            if (rel < 0.004) {
+                continue;
+            }
+            double[] l = cam.strecke(k.stueck.x0(), k.stueck.y0(), k.stueck.z0(), k.stueck.x1(), k.stueck.y1(),
+                    k.stueck.z1());
+            if (l == null) {
+                continue;
+            }
+            int grau = (int) Math.round(255 * KANTE_AUFHELLUNG_MAX * (1 - rel));
+            int deckkraft = (int) Math.round(255 * Math.min(1.0, rel / KANTE_AUSBLENDEN));
+            g.setColor(new Color(grau, grau, grau, deckkraft));
+            g.draw(new Line2D.Double(l[0], l[1], l[3], l[4]));
+        }
+        g.setStroke(new BasicStroke(1f));
     }
 
     /**
@@ -421,9 +511,10 @@ public final class Ansicht extends JPanel {
         g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
         g.setColor(HUD_TEXT);
         Haende hd = spiel.haende;
-        String text = String.format("Modus: %s | Höhe: %d cm | Tastpunkte: %d (+%d Gruppen) | Kollisionen: %d | Kontakt L[%s] R[%s]"
+        String text = String.format("Modus: %s | Höhe: %d cm | Tastpunkte: %d (+%d Gruppen) | Kanten: %d | Kollisionen: %d | Kontakt L[%s] R[%s]"
                 + " | Ausrichtungen: %d | Wandführung: %s%s", k.gehen() ? "Gehen" : "Stehen",
-                Math.round(k.beinHoehe() * 100), spiel.tastpunkte.anzahl(), spiel.tastpunkte.anzahlGruppen(), k.kollisionen(),
+                Math.round(k.beinHoehe() * 100), spiel.tastpunkte.anzahl(), spiel.tastpunkte.anzahlGruppen(), spiel.tastpunkte.anzahlKanten(),
+                k.kollisionen(),
                 hd.links.kontakt != null ? "x" : " ", hd.rechts.kontakt != null ? "x" : " ",
                 spiel.ausrichtung.anzahl(), spiel.ausrichtung.wandfuehrung() ? "an" : "aus",
                 spiel.ausrichtung.moeglich() ? " | Ausrichtung möglich" : "");

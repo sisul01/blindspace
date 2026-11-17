@@ -118,6 +118,49 @@ public final class Konstanten {
     /** Starthelligkeit eines Tastpunkts im Stehen. */
     public static final double HELLIGKEIT_STEHEN = 1.0;
 
+    // ===== Kanten (Konzept Abschnitt 8.5) =====
+
+    /**
+     * Größter Abstand eines Berührpunkts zu einer Quaderkante, bei dem die Kante als ertastet gilt. Der Punkt
+     * muss dazu in beiden Achsen, die senkrecht zur Kante stehen, höchstens so weit von der Quaderbegrenzung
+     * entfernt sein.
+     */
+    public static final double KANTE_TOLERANZ = 0.05;
+
+    /**
+     * Länge eines Kantenstücks entlang der Kante (Raster ab dem Kantenanfang). Mit 40 cm ist ein Stück doppelt so
+     * lang wie ein Tastpunkt im Stehen, damit es als Linie erkennbar ist und benachbarte Stücke zu einer
+     * durchgehenden Kante zusammenwachsen.
+     */
+    public static final double KANTE_LAENGE = 0.40;
+
+    /** Starthelligkeit eines Kantenstücks beim Gehen (höher als ein Tastpunkt, damit Linien lesbar bleiben). */
+    public static final double KANTE_HELLIGKEIT_GEHEN = 0.8;
+
+    /** Starthelligkeit eines Kantenstücks im Stehen. */
+    public static final double KANTE_HELLIGKEIT_STEHEN = 1.0;
+
+    /**
+     * Mindestzeit, bis ein bereits sichtbares Kantenstück durch erneute Berührung aufgefrischt wird (verhindert,
+     * dass bei jedem Simulationsschritt ein neues Objekt entsteht).
+     */
+    public static final double KANTE_ERNEUERUNG = 0.1;
+
+    /** Linienbreite einer Kante auf dem Bildschirm in Punkten (unabhängig von der Entfernung). */
+    public static final double KANTE_BREITE_PUNKTE = 2.0;
+
+    /**
+     * Größter Grauwert (0 = schwarz, 1 = weiß), auf den eine verblassende Kante aufgehellt wird. Eine frische Kante
+     * ist schwarz (Kontrast zu den hellen Tastkugeln); je mehr die Kugeln verblassen, desto heller wird die Linie.
+     */
+    public static final double KANTE_AUFHELLUNG_MAX = 0.6;
+
+    /**
+     * Relative Helligkeit (aktuelle durch Start-Helligkeit), unterhalb der eine Kante zusätzlich ausgeblendet wird,
+     * damit sie am Ende des Gedächtnisses verschwindet, statt als helle Linie stehen zu bleiben.
+     */
+    public static final double KANTE_AUSBLENDEN = 0.25;
+
     // ===== Gedächtnis (Konzept Abschnitt 8) =====
 
     /** Dauer des Kurzzeitgedächtnisses für Punkte, die beim Gehen entstanden sind (Verblassen bis zum Restwert). */

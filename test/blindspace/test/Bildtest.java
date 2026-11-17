@@ -20,7 +20,7 @@ public final class Bildtest {
     }
 
     /**
-     * Rendert vier Beispielbilder (Start, Wand, seitliches Tasten, Kiste geduckt) als PNG.
+     * Rendert fünf Beispielbilder (Start, Wand, seitliches Tasten, Kiste geduckt, Kanten am Pfeiler) als PNG.
      *
      * @param args optional der Zielordner (Standard: Arbeitsverzeichnis)
      * @throws Exception bei Schreibfehlern
@@ -81,6 +81,25 @@ public final class Bildtest {
         u.eingabe.stufeWunsch = 3;
         Selbsttest.lauf(u, 3.0);
         speichern(u, new File(dir, "4_kiste_geduckt.png"), true);
+
+        // 5) Pfeiler: Die Hände treten in mehreren Höhen an die senkrechten Vorderkanten heran (stehend und
+        // geduckt); die Kantenstücke wachsen zu einer durchgehenden Linie zusammen (Konzept 8.5)
+        Spiel v = new Spiel(5);
+        v.koerper.x = 1.2;
+        v.koerper.kurs = 0;
+        v.eingabe.mausBewegt = true;
+        v.eingabe.mausU = 0.25;
+        for (int stufe = 0; stufe <= 1; stufe++) {
+            v.eingabe.stufeWunsch = stufe;
+            for (double hoehe : new double[] { 0.95, 0.5, 0.05 }) {
+                v.eingabe.mausV = hoehe;
+                Selbsttest.geheY(v, 0.9); // zurücktreten: die Hände lösen sich von der Kante
+                Selbsttest.lauf(v, 0.5);
+                Selbsttest.geheY(v, 1.3); // wieder herantreten: die Hände treffen die Kante
+                Selbsttest.lauf(v, 0.3);
+            }
+        }
+        speichern(v, new File(dir, "5_kanten_pfeiler.png"), true);
     }
 
     /**
