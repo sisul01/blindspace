@@ -1,0 +1,71 @@
+# Blindspace – Steuerungs- und Visualisierungsprototyp
+
+Blindes First-Person-Erkundungsspiel: Die Welt ist unsichtbar und wird nur durch Abtasten mit den Händen
+sichtbar. Umgesetzt ist das Konzept `docs/Blindspace_Konzept_v3.md` (Version 3.0). Java 17, AWT/Swing,
+keine externen Abhängigkeiten.
+
+## In Eclipse öffnen
+
+1. *File → Import → General → Existing Projects into Workspace*.
+2. *Select archive file* (ZIP) oder *Select root directory* (entpackter Ordner `Blindspace`) wählen, Projekt anhaken, *Finish*.
+3. Rechtsklick auf `src/blindspace/Main.java` → *Run As → Java Application*.
+
+Voraussetzung: JDK 17 oder neuer. Falls Eclipse die Umgebung `JavaSE-17` nicht findet:
+*Project → Properties → Java Build Path → Libraries → JRE System Library → Alternate JRE* wählen.
+
+## Steuerung
+
+| Eingabe | Aktion |
+| --- | --- |
+| W / S oder Pfeile hoch/runter | vorwärts / rückwärts: kurzer Druck = Halbschritt (25 cm), gehalten = Vollschritte (nur aufrecht) |
+| A / D oder Pfeile links/rechts | Drehung 15° ± 1° pro Tastendruck/Intervall |
+| 1–4 | Körperhöhe 90 / 70 / 50 / 30 cm |
+| Maus | Hände führen: hoch/runter = Höhe im Tastband, links/rechts = Spannweite |
+| linke / rechte Maustaste | nach links / rechts tasten (der andere Arm bleibt vorn) |
+| Leertaste oder Num 0 | ausrichten (nur wenn die Anzeige „Ausrichtung möglich" zeigt) |
+| F1 / F3 / R | Hilfe ein/aus / Debug-Draufsicht ein/aus (nur zum Testen) / Neustart |
+
+Hinweis: Die Startrichtung ist bei jedem Start und Neustart zufällig. Die Ausrichtung ist manuell. Berührt man dieselbe Fläche zweimal (20–80 cm Abstand, mindestens 0,4 s Zeitabstand, höchstens 20 s), beginnt die Wandführung (keine Drift) und „Ausrichtung möglich" erscheint im HUD. Die Leertaste dreht dann parallel (zuletzt seitlich getastet) oder senkrecht (zuletzt nach vorn getastet) zur Fläche.
+
+## Aufbau (Pakete unter `src/blindspace`)
+
+Die Pakete sind in Schichten angeordnet; Abhängigkeiten gehen nur von oben nach unten, es gibt keine Zyklen.
+
+| Paket | Klassen | Aufgabe |
+| --- | --- | --- |
+| `blindspace` | `Main` | Startpunkt: Fenster und Spielschleife |
+| `blindspace.anzeige` | `Ansicht`, `Muster` | Darstellung (Perspektive, Tastpunkt-Muster je Oberfläche, HUD, Debug-Karte) und Tastatur-/Maus-Listener |
+| `blindspace.spiel` | `Spiel` | Spielkern ohne GUI, feste Simulationsschleife (1/120 s), legt die Reihenfolge eines Schritts fest |
+| `blindspace.spieler` | `Eingabe`, `Koerper`, `Haende`, `Ausrichtung` | Eingabezustand, Körper (Schritte, Drehung, Drift, Kollision), gespiegelte Hände, manuelle Ausrichtung und Wandführung |
+| `blindspace.tasten` | `Tastpunkt`, `Tastpunkte`, `Verblassungsgruppe` (nutzt `welt.Oberflaeche`) | räumliches Gedächtnis: Kurzzeitpunkte (15 s/30 s), Langzeitgruppen (12 min), Kollisionsdämpfung |
+| `blindspace.levels` | `Level`, `Testlevel` | Level-Schnittstelle (Welt und Startpose) und das Testlevel; weitere Levels kommen hier hinzu |
+| `blindspace.welt` | `Welt`, `Quader`, `Beruehrung`, `Koerperteil`, `Oberflaeche`, `Objektart` | unsichtbare AABB-Welt, Tastproben, 3D-Körperkollision |
+| `blindspace.konfig` | `Konstanten` | alle Balancing-Werte an einer Stelle (Konzept Abschnitt 12) |
+
+### Neues Level anlegen
+
+1. Neue Klasse im Paket `blindspace.levels` anlegen, die `Level` implementiert (Name, `erzeuge()`, Startpose).
+2. In `erzeuge()` eine `Welt` mit `welt.add(name, objektart, oberflaeche, x0, y0, x1, y1, hoehe)` aufbauen (siehe `Testlevel`).
+3. Zum Spielen `new Spiel(seed, new MeinLevel())` verwenden (in `Main` oder `SpielMitKarte`).
+
+## Tests (`test/blindspace/test`, ohne JUnit, laufen ohne Fenster)
+
+- `Selbsttest` prüft die Kernregeln des Konzepts (Gedächtnis, Kollision, Ausrichtung, Wandführung, Drift ...).
+- `Bildtest` rendert Beispielbilder nach `docs/bilder`.
+- `SpielMitKarte` startet das normal spielbare Spiel mit eingeblendeter Debug-Karte (F3 schaltet sie um).
+
+Alle per Rechtsklick -> *Run As -> Java Application* starten.
+
+## Dokumentation
+
+Alle Klassen, Methoden und Felder sind nach Javadoc-Muster dokumentiert (Deutsch). In Eclipse erscheint die
+Beschreibung beim Überfahren mit der Maus oder mit F2.
+
+## Balancing
+
+Alle Werte stehen in `Konstanten.java`, zum Beispiel `TASTINTERVALL`, `SUCHRADIUS_*`, `KZ_DAUER_GEHEN`, `KZ_DAUER_STEHEN`, `LZ_DAUER`, `KOLLISION_FAKTOR_*`, `HAND_LOESEN`,
+`LOCK_RELEASE_DIST`, `MAUS_BEREICH` (Mausempfindlichkeit) und die Tastbänder.
+
+## Nicht enthalten (bewusst, siehe Konzept Abschnitt 11)
+
+Spielziel/Win-Bedingung, Tast-Identität (Punktmuster je Objekttyp), Audio, Levelsystem.
