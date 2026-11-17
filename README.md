@@ -1,7 +1,7 @@
 # Blindspace – Steuerungs- und Visualisierungsprototyp
 
 Blindes First-Person-Erkundungsspiel: Die Welt ist unsichtbar und wird nur durch Abtasten mit den Händen
-sichtbar. Umgesetzt ist das Konzept `docs/Blindspace_Konzept_v3.md` (Version 3.3). Java 17, AWT/Swing,
+sichtbar. Umgesetzt ist das Konzept `docs/Blindspace_Konzept_v3.md` (Version 3.4). Java 17, AWT/Swing,
 keine externen Abhängigkeiten.
 
 ## In Eclipse öffnen

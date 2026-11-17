@@ -948,51 +948,65 @@ public final class Selbsttest {
     }
 
     /**
-     * Prüft die Darstellung der Kanten: helle Linie am erwarteten Bildpunkt, schwarz daneben, dunkler bei
-     * verblasster Kante, keine Ausgabe (und kein Fehler) für Kanten hinter der Kamera, Kürzen an der Bildebene.
+     * Prüft die Darstellung der Kanten: schwarze Linie von 2 Punkten Breite auf einer hellen Tastkugel, beim
+     * Verblassen heller (gegensätzlich zur Kugel), am Ende unsichtbar, keine Ausgabe für Kanten hinter der Kamera,
+     * Kürzen an der Bildebene.
      */
     static void kantenDarstellung() {
-        titel("Kanten: Darstellung als helle Linien (Abschnitt 8.5)");
+        titel("Kanten: Darstellung als schwarze Linien (Abschnitt 8.5)");
         int w = 1280, h = 720;
         Spiel s = new Spiel(62, leeresLevel());
         double ez = s.koerper.augenZ();
         double f = (w / 2.0) / Math.tan(SICHTFELD / 2);
         int px = w / 2, py = (int) Math.round(h / 2.0 - f * (1.1 - ez) / 2.0); // Mitte der Kante bei y = 2 m, z = 1,1
         pruefe(py > 40 && py < h - 40, "Aufbau: erwarteter Bildpunkt (" + px + "|" + py + ") liegt im Bild");
+        Kantenstueck kante = new Kantenstueck(1, 2, 0, 0, 2, 0, 2.0, 1.0, 0, 2.0, 1.2, Oberflaeche.GLATT);
 
-        BufferedImage leer = zeichne(s, w, h);
-        pruefe(helligkeit(leer, px, py) < 10, "ohne Kante bleibt der Bildpunkt schwarz");
+        // helle Tastkugel hinter der Kante
+        s.tastpunkte.hinzufuegen(new Tastpunkt(0, 2.0, 1.1, s.zeit(), 1.0, 0.6, KZ_DAUER_STEHEN, 1));
+        BufferedImage kugel = zeichne(s, w, h);
+        pruefe(helligkeit(kugel, px + 12, py) > 120, "Aufbau: Kugel ist hell (" + helligkeit(kugel, px + 12, py) + ")");
 
-        s.tastpunkte.kante(new Tastkante(new Kantenstueck(1, 2, 0, 0, 2, 0, 2.0, 1.0, 0, 2.0, 1.2, Oberflaeche.GLATT),
-                s.zeit(), 1.0, KZ_DAUER_STEHEN));
+        s.tastpunkte.kante(new Tastkante(kante, s.zeit(), 1.0, KZ_DAUER_STEHEN));
         BufferedImage mit = zeichne(s, w, h);
-        pruefe(helligkeit(mit, px, py) > 240, "frische Kante: weißer Kern (" + helligkeit(mit, px, py) + ")");
-        pruefe(helligkeit(mit, px + 80, py) < 10 && helligkeit(mit, px, py - 150) < 10, "neben und über der Linie bleibt es schwarz");
-        int breite = 0;
+        int dunkel = 0;
         for (int x = px - 40; x <= px + 40; x++) {
-            if (helligkeit(mit, x, py) > 200) {
-                breite++;
+            if (helligkeit(mit, x, py) < 60) {
+                dunkel++;
             }
         }
-        pruefe(breite >= (int) KANTE_MIN_PIXEL - 1, "Linie mindestens " + (int) KANTE_MIN_PIXEL + " Pixel breit (" + breite + ")");
+        pruefe(helligkeit(mit, px, py) < 40, "frische Kante: schwarzer Kern (" + helligkeit(mit, px, py) + ")");
+        pruefe(helligkeit(mit, px + 12, py) > 120 && helligkeit(mit, px - 12, py) > 120, "neben der Linie bleibt die Kugel hell");
+        pruefe(dunkel >= 2 && dunkel <= 3, "Linie 2 Punkte breit (" + dunkel + " Pixel)");
 
+        // Verblassen: Kugel und Kante gleich alt (10 s im Stehen): Linie heller als frisch
+        Spiel mittel = new Spiel(66, leeresLevel());
+        mittel.tastpunkte.kante(new Tastkante(kante, mittel.zeit() - 10.0, 1.0, KZ_DAUER_STEHEN));
+        int hMittel = helligkeit(zeichne(mittel, w, h), px, py);
+        pruefe(hMittel > 60 && hMittel < 200, "verblasste Kante ist aufgehellt, grau (" + hMittel + ")");
+        Spiel kg = new Spiel(67, leeresLevel());
+        kg.tastpunkte.hinzufuegen(new Tastpunkt(0, 2.0, 1.1, kg.zeit(), 1.0, 0.6, KZ_DAUER_STEHEN, 1));
+        kg.tastpunkte.kante(new Tastkante(kante, kg.zeit() - 10.0, 1.0, KZ_DAUER_STEHEN));
+        pruefe(helligkeit(zeichne(kg, w, h), px, py) > helligkeit(mit, px, py) + 40, "auf gleicher Kugel: älter = heller als frisch");
+
+        // Ende des Gedächtnisses: unsichtbar auf schwarzem Grund
         Spiel alt = new Spiel(63, leeresLevel());
-        alt.tastpunkte.kante(new Tastkante(teststueck(Oberflaeche.GLATT), alt.zeit() - 29.0, 1.0, KZ_DAUER_STEHEN));
-        pruefe(helligkeit(zeichne(alt, w, h), px, py) < helligkeit(mit, px, py) / 2, "verblasste Kante ist deutlich dunkler");
+        alt.tastpunkte.kante(new Tastkante(kante, alt.zeit() - 29.9, 1.0, KZ_DAUER_STEHEN));
+        pruefe(helligkeit(zeichne(alt, w, h), px, py) < 30, "fast verblasste Kante ist (fast) unsichtbar");
 
-        // Kanten außerhalb des Blickfelds: hinter der Kamera und an ihr vorbei
+        // Kanten außerhalb des Blickfelds: hinter der Kamera und an ihr vorbei (aufgehellte Linie, sichtbar auf Schwarz)
         Spiel hinten = new Spiel(64, leeresLevel());
         hinten.tastpunkte.kante(new Tastkante(new Kantenstueck(1, 2, 0, 0, 0, 0, -2.0, 1.0, 0, -2.0, 1.2, Oberflaeche.GLATT),
-                hinten.zeit(), 1.0, KZ_DAUER_STEHEN));
+                hinten.zeit() - 10.0, 1.0, KZ_DAUER_STEHEN));
         pruefe(helligkeit(zeichne(hinten, w, h), px, py) < 10, "Kante hinter der Kamera wird nicht gezeichnet");
 
         Spiel quer = new Spiel(65, leeresLevel());
         quer.tastpunkte.kante(new Tastkante(new Kantenstueck(1, 1, 0, 0, 0, 0, -1.0, 1.0, 0, 3.0, 1.0, Oberflaeche.GLATT),
-                quer.zeit(), 1.0, KZ_DAUER_STEHEN));
+                quer.zeit() - 10.0, 1.0, KZ_DAUER_STEHEN));
         BufferedImage q = zeichne(quer, w, h);
         int hell = 0;
         for (int yy = 40; yy < h; yy++) {
-            if (helligkeit(q, px, yy) > 200) {
+            if (helligkeit(q, px, yy) > 60) {
                 hell++;
             }
         }

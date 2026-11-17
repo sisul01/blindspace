@@ -1,4 +1,4 @@
-# Blindspace – Spielkonzept, Version 3.3 (bereinigt)
+# Blindspace – Spielkonzept, Version 3.4 (bereinigt)
 
 > Dieses Dokument beschreibt das Spielkonzept „Blindspace" (früher „Der Ausgang") vollständig, inklusive aller Entscheidungen aus der Prototyp-Iteration und der anschließenden Konzeptprüfung. Es ist als Eingabe (KI-Prompt) für die nächste Iteration formuliert. Ein existierender Java-Prototyp (Eclipse, Java 17, AWT/Swing, keine externen Abhängigkeiten) bestätigt die Spielbarkeit der Mechanik. Diese Fassung ersetzt Version 1 und 2 und ist die verbindliche Basis. Das übergeordnete Spielkonzept steht im „Blindspace – Game Design Document" (Version 1.0); dieses Dokument legt die Steuerung und das Gedächtnismodell des Prototyps fest und weist Abweichungen zum GDD aus (Abschnitt 15).
 
@@ -19,7 +19,7 @@
 | 7.5 | (v3.2) Neu: **automatische Parallelausrichtung** beim Loslaufen, wenn eine seitlich tastende Hand eine senkrechte Fläche berührt und die Blickrichtung höchstens 20° von der Flächenrichtung abweicht. Sie startet auch die Wandführung. Die Ausrichtung per Leertaste bleibt. |
 | 4.3 | (v3.2) Tiefstes Tastband beginnt bei 5 cm statt 20 cm (Stufen ertastbar); Maximum bleibt 180 cm. Der Boden selbst und Gegenstände unterhalb des Bandes sind nicht ertastbar. |
 | 4.3, 5 | (v3.2) Geduckt (Körperhöhen 70 / 50 / 30 cm) sind Einzelschritte von 10 cm vorwärts und rückwärts möglich; bisher war Gehen geduckt gesperrt. |
-| 8.5 | (v3.3) Neu: **Kanten.** Berührt eine Hand eine Quaderfläche höchstens 5 cm von einer Kante entfernt, wird ein 40 cm langes Kantenstück als helle Linie sichtbar (weißer Kern, dunkler Saum, über den Tastpunkten). Kanten werden bei jedem Simulationsschritt geprüft, verblassen wie Tastpunkte und werden bei erneuter Berührung aufgefrischt. Abweichung vom GDD: Linien statt Kugeln (Abschnitt 15.2). |
+| 8.5 | (v3.4) Darstellung geändert: schwarze Linie, 2 Punkte breit, beim Verblassen aufgehellt (gegensätzlich zu den Kugeln). (v3.3) Neu: **Kanten.** Berührt eine Hand eine Quaderfläche höchstens 5 cm von einer Kante entfernt, wird ein 40 cm langes Kantenstück als Linie sichtbar (schwarz, über den Tastpunkten). Kanten werden bei jedem Simulationsschritt geprüft, verblassen wie Tastpunkte und werden bei erneuter Berührung aufgefrischt. Abweichung vom GDD: Linien statt Kugeln (Abschnitt 15.2). |
 | 15 | Neu in v3.0: Mehrgeschossigkeit (Planung) und Abgleich mit dem Blindspace-GDD. |
 | 9 | Ablauf bei niedrigen Objekten neu beschrieben; Erreichbarkeitstabelle ergänzt (korrigiert in v2.1); Pfeiler auf 1,6 m erhöht; Tippfehler und Widerspruch entfernt. |
 | 14 | Neu in v2.1: Umsetzungsentscheidungen des Eclipse-Prototyps. |
@@ -253,7 +253,7 @@ Kanten sind wichtig, um Objekte zu erkennen (GDD Abschnitt 16: „Unterscheidung
 - **Takt.** Anders als Tastpunkte (höchstens alle 0,5 s) werden Kanten bei **jedem Simulationsschritt** geprüft. Eine Hand, die schnell über eine Kante streicht (bis 1,6 m/s), würde die schmale Zone sonst zwischen zwei Tastpunkten verpassen.
 - **Helligkeit und Gedächtnis.** Start 100 % im Stehen und **80 %** im Gehen, also heller als ein Tastpunkt (50 % im Gehen), damit Linien lesbar bleiben. Im Kurzzeitgedächtnis gilt dasselbe Verblassen wie bei Punkten (8.3: 15 s im Gehen, 30 s im Stehen bis 2,5 %). Danach sinkt die Helligkeit linear auf 0 (12 min, bei strukturierten Oberflächen 6 min). Kanten werden **nicht zu Gruppen zusammengefasst und nicht unscharf**: Ein Kantenstück bleibt eine scharfe Linie, bis es verschwindet. Kollisionen dämpfen Kanten wie Punkte (Faktoren aus Abschnitt 6).
 - **Auffrischen.** Von jedem Kantenstück gibt es höchstens eine Instanz. Eine erneute Berührung setzt Helligkeit und Zeit zurück (frühestens 0,1 s nach der letzten Aufnahme, `KANTE_ERNEUERUNG`). Das ist für Kanten schon festgelegt, damit nicht bei jedem Schritt neue Objekte entstehen; ein Zeitzuschlag (+2 s, GDD Abschnitt 4) gibt es nicht. Für Tastpunkte bleibt das Auffrischen offen (15.2).
-- **Darstellung.** Weiße Linie, 2,5 cm breit (perspektivisch, auf dem Bildschirm mindestens 4 Pixel), mit weichem weißem Schein und einem **dunklen Saum**. Der Saum hebt die Linie auch von hellen Tastpunkten ab, über denen sie gezeichnet wird. Linien, die teilweise hinter der Kamera liegen, werden an der Bildebene gekürzt. Es gibt keine Farben (Schwarz-Weiß wie überall, Abschnitt 8.1).
+- **Darstellung (v3.4).** Die Linie ist **schwarz** und **2 Punkte breit**, unabhängig von der Entfernung (`KANTE_BREITE_PUNKTE`); sie liegt über den Tastpunkten und bildet den Kontrast zu den hellen Kugeln. Beim Verblassen verhält sie sich **gegensätzlich** zu den Kugeln: Je dunkler diese werden, desto heller wird die Linie (Grauwert bis `KANTE_AUFHELLUNG_MAX` = 60 %); unter 25 % der Starthelligkeit (`KANTE_AUSBLENDEN`) wird sie zusätzlich transparent und verschwindet am Ende des Gedächtnisses. Kein Schein, kein Saum. Linien, die teilweise hinter der Kamera liegen, werden an der Bildebene gekürzt. Auf schwarzem Grund ist eine frische Kante unsichtbar; sie wirkt nur dort, wo Tastkugeln liegen. Die Darstellung ist bewusst allgemein gehalten, damit später auch Ränder anderer Objekte so gezeichnet werden können.
 - **Beispielbild:** `docs/bilder/5_kanten_pfeiler.png` zeigt die Hände am Pfeiler: zusammenhängende senkrechte Kanten, die Oberkante, und ältere, schon verblasste Stücke oben.
 
 ## 9. Testlevel (Prototyp)
@@ -339,7 +339,8 @@ Alle Werte liegen in einer zentralen Konstantenklasse und lassen sich ohne Eingr
 | Kante: Länge eines Stücks (`KANTE_LAENGE`) | 40 cm |
 | Kante: Starthelligkeit Gehen / Stehen | 80 % / 100 % |
 | Kante: Mindestabstand fürs Auffrischen (`KANTE_ERNEUERUNG`) | 0,1 s |
-| Kante: Linienbreite / mindestens (`KANTE_BREITE`, `KANTE_MIN_PIXEL`) | 2,5 cm / 4 Pixel |
+| Kante: Linienbreite (`KANTE_BREITE_PUNKTE`) | 2 Punkte |
+| Kante: größte Aufhellung / Ausblenden unter (`KANTE_AUFHELLUNG_MAX`, `KANTE_AUSBLENDEN`) | 60 % Grau / 25 % Helligkeit |
 | Tastbänder | siehe 4.3 |
 
 ## 13. Auftrag für die KI / nächste Iteration
@@ -355,7 +356,7 @@ Implementiere (oder analysiere) dieses Konzept als spielbaren Prototyp in Java (
 7. Manuelle Ausrichtung nach Abschnitt 7: Protokoll in jedem Modus, Tastpaar (gleiche Fläche, 20–80 cm, 0,4–20 s), Ausführung nur per Leertaste/Num 0, Parallel (seitliches Tasten) oder Senkrecht (Tasten nach vorn), Wandführung ab gültigem Tastpaar bis kein Objekt mehr in Reichweite. Zusätzlich automatische Parallelausrichtung beim Loslaufen mit seitlichem Wandkontakt bis 20° Abweichung (Abschnitt 7.5).
 8. Hände synchron gespiegelt, im Körper-Koordinatensystem geführt (drehen immer mit), synchroner Stopp bei einseitigem Kontakt, definierte Startpose.
 9. Alle Balancing-Werte in einer zentralen Konstantenklasse (Abschnitt 12).
-10. Kanten nach Abschnitt 8.5: Berührung höchstens 5 cm von einer Quaderkante ertastet ein 40-cm-Kantenstück, Prüfung bei jedem Simulationsschritt, Darstellung als weiße Linie mit dunklem Saum über den Tastpunkten.
+10. Kanten nach Abschnitt 8.5: Berührung höchstens 5 cm von einer Quaderkante ertastet ein 40-cm-Kantenstück, Prüfung bei jedem Simulationsschritt, Darstellung als schwarze 2-Punkt-Linie über den Tastpunkten, beim Verblassen aufgehellt.
 
 ## 14. Umsetzungsentscheidungen des Eclipse-Prototyps (v2.1)
 
@@ -379,7 +380,7 @@ Beim Umsetzen mussten einige Details festgelegt werden, die das Konzept offenlie
 | Duckschritte (v3.2) | Jeder Tastendruck ergibt genau einen Schritt von 10 cm; nach dem Schritt sperrt die Gehsperre bis zum Loslassen der Taste. Kein Halbschritt, keine Drift, Modus „Stehen“. Die Blockade durch die vordere Hand gilt unverändert. |
 | Tastband und Boden (v3.2) | Das tiefste Band beginnt bei 5 cm. Die Hände sondieren ohne Boden (`Welt.sondiere(..., false)`); die Variante mit Boden bleibt für die Welt und die Tests erhalten. |
 | Kanten (v3.3) | `Welt.kanten` liefert zu einer `Beruehrung` die `Kantenstueck`e (Record, Schlüssel der Verwaltung); `Tastkante` hält Zeit und Helligkeit, `Tastpunkte` verwaltet sie in einer Map (ein Eintrag je Stück). `Spiel` prüft bei jedem Schritt jede Hand mit Kontakt. Die Geometrie liegt in `welt`, damit `tasten` weiterhin nur `welt` nutzt (keine Zyklen). |
-| Kantenlinie (v3.3) | `Ansicht.zeichneKanten`: Schein, dunkler Saum, heller Kern, nach den Punkten gezeichnet; die Kamera kürzt Strecken an der Bildebene (`Kamera.strecke`). |
+| Kantenlinie (v3.4) | `Ansicht.zeichneKanten`: eine schwarze Linie von 2 Punkten, nach den Punkten gezeichnet, Grauwert und Deckkraft aus der relativen Helligkeit; die Kamera kürzt Strecken an der Bildebene (`Kamera.strecke`). |
 | Wandführung | Endet, wenn keine Hand Kontakt hat und der horizontale Abstand zur nächsten Fläche im aktuellen Tastband größer als 1,0 m ist. |
 | Kamera | Auge in der Kopfmitte (Körperhöhe + 70 cm), Sichtfeld 120°, Blick fest an die Körperausrichtung gebunden. |
 | Entwicklungshilfe | F3 blendet eine Draufsicht ein (nur zum Testen, widerspricht dem Blind-Konzept). F1 blendet die Hilfe ein, R startet neu. |
@@ -421,6 +422,6 @@ Eine Umsetzung ist für Phase 3 des GDD vorgesehen und erfordert die Änderungen
 | Mehrgeschossigkeit | Treppen, Podeste | geplant (15.1) |
 | Audio | später, unterstützend | später; Prototyp bewusst ohne Audio |
 | Tastpunkt-Menge | – | durch Verblassungsgruppen begrenzt |
-| Kanten | „Unterscheidung von Oberflächen über Muster und Kanten“ (Abschnitt 16); Kontakte erzeugen kugelförmige Visualisierungen (Abschnitt 14) | **umgesetzt (v3.3, 8.5). Abweichung:** Kantenstücke sind Linien statt Kugeln, 40 cm lang, mit eigener Helligkeit (80 % im Gehen) und ohne Gruppierung im Langzeitgedächtnis. Das GDD beschreibt Kanten nur in der Zusammenfassung; Form und Werte sind eine Auslegung und im Spieltest zu prüfen |
+| Kanten | „Unterscheidung von Oberflächen über Muster und Kanten“ (Abschnitt 16); Kontakte erzeugen kugelförmige Visualisierungen (Abschnitt 14) | **umgesetzt (v3.3, 8.5). Abweichung:** Kantenstücke sind Linien statt Kugeln, 40 cm lang, schwarz statt hell (Kontrast zu den Kugeln), mit eigener Helligkeit (80 % im Gehen) und ohne Gruppierung im Langzeitgedächtnis. Das GDD beschreibt Kanten nur in der Zusammenfassung; Form und Werte sind eine Auslegung und im Spieltest zu prüfen |
 | Automatische Ausrichtung, Duckschritte, Tastband ab 5 cm | – (nicht im GDD) | konzeptinterne Ergänzungen (v3.2), kein Widerspruch zum GDD; GDD Abschnitt 14 nennt Bewegungsungenauigkeit als Schwierigkeitsfaktor, die Wandführung mildert sie an Wänden |
 | Darstellung | nur Schwarz/Weiß | übernommen für die Tastpunkte (weiß auf schwarz). Die Handränder (hell, bei Kontakt orange) und das HUD sind Rückmeldungen des Prototyps und bleiben farbig |

@@ -146,11 +146,20 @@ public final class Konstanten {
      */
     public static final double KANTE_ERNEUERUNG = 0.1;
 
-    /** Linienbreite einer Kante in Metern (perspektivisch skaliert). */
-    public static final double KANTE_BREITE = 0.025;
+    /** Linienbreite einer Kante auf dem Bildschirm in Punkten (unabhängig von der Entfernung). */
+    public static final double KANTE_BREITE_PUNKTE = 2.0;
 
-    /** Kleinste Linienbreite einer Kante auf dem Bildschirm in Pixeln. */
-    public static final double KANTE_MIN_PIXEL = 4.0;
+    /**
+     * Größter Grauwert (0 = schwarz, 1 = weiß), auf den eine verblassende Kante aufgehellt wird. Eine frische Kante
+     * ist schwarz (Kontrast zu den hellen Tastkugeln); je mehr die Kugeln verblassen, desto heller wird die Linie.
+     */
+    public static final double KANTE_AUFHELLUNG_MAX = 0.6;
+
+    /**
+     * Relative Helligkeit (aktuelle durch Start-Helligkeit), unterhalb der eine Kante zusätzlich ausgeblendet wird,
+     * damit sie am Ende des Gedächtnisses verschwindet, statt als helle Linie stehen zu bleiben.
+     */
+    public static final double KANTE_AUSBLENDEN = 0.25;
 
     // ===== Gedächtnis (Konzept Abschnitt 8) =====
 

@@ -356,19 +356,22 @@ public final class Ansicht extends JPanel {
     }
 
     /**
-     * Zeichnet alle ertasteten Kantenstücke als scharfe weiße Linien mit weichem Schein und dunklem Saum, über den
-     * Tastpunkten, damit keine Kugel eine Kante verdeckt und die Linie auch auf hellem Grund sichtbar bleibt. Die Deckkraft ist die Helligkeit des Stücks; die Linienbreite wächst perspektivisch, bleibt aber mindestens
-     * {@code KANTE_MIN_PIXEL} breit, damit auch entfernte Kanten gut sichtbar sind.
+     * Zeichnet alle ertasteten Kantenstücke als schwarze Linien konstanter Breite ({@code KANTE_BREITE_PUNKTE}) über
+     * den Tastpunkten, als Kontrast zu den hellen Kugeln. Beim Verblassen verhält sich die Linie gegensätzlich zu den
+     * Kugeln: Je dunkler diese werden, desto heller wird die Linie (bis {@code KANTE_AUFHELLUNG_MAX}); unterhalb von
+     * {@code KANTE_AUSBLENDEN} der Starthelligkeit wird sie zusätzlich transparent und verschwindet.
      *
      * @param g   Grafikkontext
      * @param cam Kamera
      */
     private void zeichneKanten(Graphics2D g, Kamera cam) {
         double zeit = spiel.zeit();
+        g.setComposite(AlphaComposite.SrcOver);
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        g.setStroke(new BasicStroke((float) KANTE_BREITE_PUNKTE, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
         for (Tastkante k : spiel.tastpunkte.kanten()) {
-            double hell = Math.min(1.0, k.helligkeit(zeit));
-            if (hell < 0.004) {
+            double rel = Math.min(1.0, k.helligkeit(zeit) / k.h0);
+            if (rel < 0.004) {
                 continue;
             }
             double[] l = cam.strecke(k.stueck.x0(), k.stueck.y0(), k.stueck.z0(), k.stueck.x1(), k.stueck.y1(),
@@ -376,24 +379,11 @@ public final class Ansicht extends JPanel {
             if (l == null) {
                 continue;
             }
-            double tiefe = (l[2] + l[5]) / 2;
-            float breite = (float) Math.max(KANTE_MIN_PIXEL, cam.f * KANTE_BREITE / tiefe);
-            Line2D.Double linie = new Line2D.Double(l[0], l[1], l[3], l[4]);
-            // Schein (weiß, breit, schwach), dunkler Saum (hebt die Linie von hellen Tastpunkten ab), heller Kern
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) (0.28 * hell)));
-            g.setStroke(new BasicStroke(breite * 3.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.setColor(Color.WHITE);
-            g.draw(linie);
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) (0.85 * hell)));
-            g.setStroke(new BasicStroke(breite * 2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.setColor(Color.BLACK);
-            g.draw(linie);
-            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) hell));
-            g.setStroke(new BasicStroke(breite, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.setColor(Color.WHITE);
-            g.draw(linie);
+            int grau = (int) Math.round(255 * KANTE_AUFHELLUNG_MAX * (1 - rel));
+            int deckkraft = (int) Math.round(255 * Math.min(1.0, rel / KANTE_AUSBLENDEN));
+            g.setColor(new Color(grau, grau, grau, deckkraft));
+            g.draw(new Line2D.Double(l[0], l[1], l[3], l[4]));
         }
-        g.setComposite(AlphaComposite.SrcOver);
         g.setStroke(new BasicStroke(1f));
     }
 
