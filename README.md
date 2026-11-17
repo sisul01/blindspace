@@ -1,7 +1,7 @@
 # Blindspace – Steuerungs- und Visualisierungsprototyp
 
 Blindes First-Person-Erkundungsspiel: Die Welt ist unsichtbar und wird nur durch Abtasten mit den Händen
-sichtbar. Umgesetzt ist das Konzept `docs/Blindspace_Konzept_v3.md` (Version 3.0). Java 17, AWT/Swing,
+sichtbar. Umgesetzt ist das Konzept `docs/Blindspace_Konzept_v3.md` (Version 3.2). Java 17, AWT/Swing,
 keine externen Abhängigkeiten.
 
 ## In Eclipse öffnen
@@ -17,7 +17,7 @@ Voraussetzung: JDK 17 oder neuer. Falls Eclipse die Umgebung `JavaSE-17` nicht f
 
 | Eingabe | Aktion |
 | --- | --- |
-| W / S oder Pfeile hoch/runter | vorwärts / rückwärts: kurzer Druck = Halbschritt (25 cm), gehalten = Vollschritte (nur aufrecht) |
+| W / S oder Pfeile hoch/runter | vorwärts / rückwärts: kurzer Druck = Halbschritt (25 cm), gehalten = Vollschritte (aufrecht); geduckt: ein Schritt von 10 cm je Tastendruck |
 | A / D oder Pfeile links/rechts | Drehung 15° ± 1° pro Tastendruck/Intervall |
 | 1–4 | Körperhöhe 90 / 70 / 50 / 30 cm |
 | Maus | Hände führen: hoch/runter = Höhe im Tastband, links/rechts = Spannweite |
@@ -25,7 +25,7 @@ Voraussetzung: JDK 17 oder neuer. Falls Eclipse die Umgebung `JavaSE-17` nicht f
 | Leertaste oder Num 0 | ausrichten (nur wenn die Anzeige „Ausrichtung möglich" zeigt) |
 | F1 / F3 / R | Hilfe ein/aus / Debug-Draufsicht ein/aus (nur zum Testen) / Neustart |
 
-Hinweis: Die Startrichtung ist bei jedem Start und Neustart zufällig. Die Ausrichtung ist manuell. Berührt man dieselbe Fläche zweimal (20–80 cm Abstand, mindestens 0,4 s Zeitabstand, höchstens 20 s), beginnt die Wandführung (keine Drift) und „Ausrichtung möglich" erscheint im HUD. Die Leertaste dreht dann parallel (zuletzt seitlich getastet) oder senkrecht (zuletzt nach vorn getastet) zur Fläche.
+Hinweis: Die Startrichtung ist bei jedem Start und Neustart zufällig. Die Ausrichtung per Leertaste ist manuell. Berührt man dieselbe Fläche zweimal (20–80 cm Abstand, mindestens 0,4 s Zeitabstand, höchstens 20 s), beginnt die Wandführung (keine Drift) und „Ausrichtung möglich" erscheint im HUD. Die Leertaste dreht dann parallel (zuletzt seitlich getastet) oder senkrecht (zuletzt nach vorn getastet) zur Fläche. Zusätzlich richtet sich der Körper beim Loslaufen automatisch parallel zur Wand aus, wenn eine seitlich tastende Hand die Wand berührt und die Blickrichtung höchstens 20° abweicht (dann beginnt auch die Wandführung).
 
 ## Aufbau (Pakete unter `src/blindspace`)
 
@@ -64,7 +64,7 @@ Beschreibung beim Überfahren mit der Maus oder mit F2.
 ## Balancing
 
 Alle Werte stehen in `Konstanten.java`, zum Beispiel `TASTINTERVALL`, `SUCHRADIUS_*`, `KZ_DAUER_GEHEN`, `KZ_DAUER_STEHEN`, `LZ_DAUER`, `KOLLISION_FAKTOR_*`, `HAND_LOESEN`,
-`LOCK_RELEASE_DIST`, `MAUS_BEREICH` (Mausempfindlichkeit) und die Tastbänder.
+`LOCK_RELEASE_DIST`, `MAUS_BEREICH` (Mausempfindlichkeit), `DUCK_SCHRITT`, `AUSR_AUTO_MAX_WINKEL`, `TAST_MIN_HOEHE` und die Tastbänder.
 
 ## Nicht enthalten (bewusst, siehe Konzept Abschnitt 11)
 

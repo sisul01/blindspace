@@ -439,7 +439,7 @@ public final class Ansicht extends JPanel {
     private void zeichneHilfe(Graphics2D g, int h) {
         g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         g.setColor(new Color(110, 125, 140));
-        String[] zeilen = { "W/S oder Pfeile hoch/runter: gehen (nur aufrecht)   A/D oder Pfeile links/rechts: drehen",
+        String[] zeilen = { "W/S oder Pfeile hoch/runter: gehen (geduckt: Schritte à 10 cm)   A/D oder Pfeile links/rechts: drehen",
                 "1-4: Körperhöhe (aufrecht ... geduckt)   Maus: Hände führen (Höhe, Spannweite)   Leertaste/Num 0: ausrichten",
                 "linke/rechte Maustaste: nach links/rechts tasten   F1: Hilfe   F3: Debug-Karte   R: Neustart" };
         for (int i = 0; i < zeilen.length; i++) {

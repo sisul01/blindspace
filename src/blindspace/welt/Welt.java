@@ -137,6 +137,21 @@ public final class Welt {
      * @return die nächste {@link Beruehrung} oder {@code null}, wenn nichts im Radius liegt
      */
     public Beruehrung sondiere(double x, double y, double z, double radius) {
+        return sondiere(x, y, z, radius, true);
+    }
+
+    /**
+     * Tastprobe wie {@link #sondiere(double, double, double, double)}, wahlweise ohne den virtuellen Boden.
+     * Die Hände tasten ohne Boden: Der Boden selbst und Gegenstände am Boden sind nicht ertastbar.
+     *
+     * @param x        X-Koordinate des Probenmittelpunkts
+     * @param y        Y-Koordinate des Probenmittelpunkts
+     * @param z        Z-Koordinate des Probenmittelpunkts
+     * @param radius   Radius der Probenkugel
+     * @param mitBoden true, wenn auch der Boden (ID {@link #BODEN_ID}) getroffen werden kann
+     * @return die nächste {@link Beruehrung} oder {@code null}, wenn nichts im Radius liegt
+     */
+    public Beruehrung sondiere(double x, double y, double z, double radius, boolean mitBoden) {
         Beruehrung best = null;
         for (Quader q : quader) {
             double cx = clamp(x, q.minX, q.maxX);
@@ -180,7 +195,7 @@ public final class Welt {
                 best = b;
             }
         }
-        if (z <= radius) {
+        if (mitBoden && z <= radius) {
             double d = Math.max(0, z);
             if (best == null || d < best.abstand()) {
                 best = new Beruehrung(BODEN_ID, 2, 1, x, y, 0, d, Oberflaeche.RAU, Objektart.BODEN);

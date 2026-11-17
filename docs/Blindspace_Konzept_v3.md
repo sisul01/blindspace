@@ -1,4 +1,4 @@
-# Blindspace – Spielkonzept, Version 3.1 (bereinigt)
+# Blindspace – Spielkonzept, Version 3.2 (bereinigt)
 
 > Dieses Dokument beschreibt das Spielkonzept „Blindspace" (früher „Der Ausgang") vollständig, inklusive aller Entscheidungen aus der Prototyp-Iteration und der anschließenden Konzeptprüfung. Es ist als Eingabe (KI-Prompt) für die nächste Iteration formuliert. Ein existierender Java-Prototyp (Eclipse, Java 17, AWT/Swing, keine externen Abhängigkeiten) bestätigt die Spielbarkeit der Mechanik. Diese Fassung ersetzt Version 1 und 2 und ist die verbindliche Basis. Das übergeordnete Spielkonzept steht im „Blindspace – Game Design Document" (Version 1.0); dieses Dokument legt die Steuerung und das Gedächtnismodell des Prototyps fest und weist Abweichungen zum GDD aus (Abschnitt 15).
 
@@ -16,6 +16,9 @@
 | 6 | (v3.0) Kollision erzeugt einen Tastpunkt (Regeln des Gehens). Dämpfungsfaktoren je Körperteil: Beine 0,7 / Rumpf 0,55 / Kopf 0,4. |
 | 8.3 | (v3.0) Zweistufiges Gedächtnis: Kurzzeit (Gehen 15 s, Stehen 30 s auf 2,5 %), Langzeit mit Verblassungsgruppen (12 min). Die Löschung nach 35 s und die Einheits-Konstante k entfallen. |
 | 8.1 | (v3.1) Oberflächenarten rau / glatt / strukturiert; Darstellung ausschließlich weiß auf schwarz, Oberfläche zeigt sich im Muster. |
+| 7.5 | (v3.2) Neu: **automatische Parallelausrichtung** beim Loslaufen, wenn eine seitlich tastende Hand eine senkrechte Fläche berührt und die Blickrichtung höchstens 20° von der Flächenrichtung abweicht. Sie startet auch die Wandführung. Die Ausrichtung per Leertaste bleibt. |
+| 4.3 | (v3.2) Tiefstes Tastband beginnt bei 5 cm statt 20 cm (Stufen ertastbar); Maximum bleibt 180 cm. Der Boden selbst und Gegenstände unterhalb des Bandes sind nicht ertastbar. |
+| 4.3, 5 | (v3.2) Geduckt (Körperhöhen 70 / 50 / 30 cm) sind Einzelschritte von 10 cm vorwärts und rückwärts möglich; bisher war Gehen geduckt gesperrt. |
 | 15 | Neu in v3.0: Mehrgeschossigkeit (Planung) und Abgleich mit dem Blindspace-GDD. |
 | 9 | Ablauf bei niedrigen Objekten neu beschrieben; Erreichbarkeitstabelle ergänzt (korrigiert in v2.1); Pfeiler auf 1,6 m erhöht; Tippfehler und Widerspruch entfernt. |
 | 14 | Neu in v2.1: Umsetzungsentscheidungen des Eclipse-Prototyps. |
@@ -79,7 +82,7 @@ Die Y-Komponente (Arm nach vorn) wird vom System gesteuert. Beim Tasten nach lin
 
 ### 4.3 Tastmodi und Tastbänder
 
-**Definition Gehen/Stehen:** „Gehen" gilt, solange ein Schritt läuft oder eine Gehtaste gehalten wird, plus **0,3 s Nachlauf** (verhindert Flackern des Modus). In allen anderen Fällen, auch bei reiner Drehung, gilt „Stehen".
+**Definition Gehen/Stehen:** „Gehen" gilt, solange ein Schritt läuft oder eine Gehtaste gehalten wird, plus **0,3 s Nachlauf** (verhindert Flackern des Modus). In allen anderen Fällen, auch bei reiner Drehung und bei Duckschritten (siehe unten), gilt „Stehen".
 
 | | Tasten im Gehen | Abtasten im Stehen |
 | --- | --- | --- |
@@ -95,11 +98,13 @@ Die Y-Komponente (Arm nach vorn) wird vom System gesteuert. Beim Tasten nach lin
 | Stehen | 90 | 140–180 | 40 |
 | Stehen | 70 | 100–140 | 40 |
 | Stehen | 50 | 60–100 | 40 |
-| Stehen | 30 | 20–60 | 40 |
+| Stehen | 30 | 5–60 | 55 |
 
 Im Gehen wird zusätzlich automatisch nach vorn getastet (Kollisionsvermeidung).
 
-**Gehen ist nur aufrecht (h = 90 cm) erlaubt.** Bei geduckter Haltung (h < 90 cm) sind die Gehtasten (W/S, Pfeiltasten hoch/runter) wirkungslos; der Spieler muss sich zuerst aufrichten. Drehen (A/D) bleibt in allen Körperhöhen möglich. Wechselt der Spieler während des Gehens auf eine niedrigere Stufe, wird der laufende Schritt noch beendet.
+**Tiefste Tasthöhe (v3.2).** Das tiefste Band beginnt bei 5 cm (Konstante `TAST_MIN_HOEHE`), damit niedrige Stufen (Abschnitt 15.1) ertastbar sind. Das Maximum bleibt 180 cm. Der **Boden selbst ist nie ertastbar**, ebenso wenig Gegenstände am Boden, die unter dem Band liegen: Die Probenkugel (Suchradius 3 cm im Stehen) reicht von der tiefsten Handhöhe bis etwa 2 cm über den Boden. Die Hände ignorieren den Boden also ausdrücklich; die Tastprobe der Welt kennt ihn weiterhin (ID −1).
+
+**Gehen (Vollschritte und Halbschritte) ist nur aufrecht (h = 90 cm) erlaubt.** Bei geduckter Haltung (h < 90 cm) gibt es stattdessen **Einzelschritte von 10 cm** vorwärts und rückwärts (W/S, Pfeiltasten hoch/runter; Einzelheiten in Abschnitt 5). Drehen (A/D) bleibt in allen Körperhöhen möglich. Wechselt der Spieler während des Gehens auf eine niedrigere Stufe, wird der laufende Schritt noch beendet.
 
 ### 4.4 Tastrate und Ereignislogik
 
@@ -110,7 +115,7 @@ Im Gehen wird zusätzlich automatisch nach vorn getastet (Kollisionsvermeidung).
 
 ### 4.5 Handkontakt beim Gehen
 
-Trifft die nach vorn zeigende Hand beim Gehen auf ein Objekt: Der Körper bleibt stehen, ein **Tastereignis** wird ausgelöst (kein Kollisionsereignis). Trifft die seitlich tastende Hand eine Wand, läuft der Körper weiter; das Tastereignis wird protokolliert und kann ein Tastpaar bilden und die Ausrichtung möglich machen (siehe Abschnitt 7).
+Trifft die nach vorn zeigende Hand beim Gehen auf ein Objekt: Der Körper bleibt stehen, ein **Tastereignis** wird ausgelöst (kein Kollisionsereignis). Trifft die seitlich tastende Hand eine Wand, läuft der Körper weiter; das Tastereignis wird protokolliert und kann ein Tastpaar bilden und die Ausrichtung möglich machen (siehe Abschnitt 7). Beim Loslaufen richtet sich der Körper in diesem Fall außerdem automatisch parallel zur Wand aus (Abschnitt 7.5).
 
 ## 5. Bewegung und Zufallsdrift
 
@@ -118,6 +123,7 @@ Realitätsprinzip: Niemand hält exakt eine Gerade oder dreht exakt um einen Win
 
 - Schritt: 50 cm Strecke; Gehgeschwindigkeit ca. 1,1 m/s.
 - **Tastendauer:** Wird die Gehtaste (vorwärts/rückwärts) gehalten, folgen kontinuierlich Vollschritte bis zum Loslassen; ein begonnener Schritt wird zu Ende geführt. Wird die Taste bei einem **kurzen Einzeldruck** losgelassen, bevor der halbe Schritt (25 cm) erreicht ist, endet der Schritt als **Halbschritt (25 cm)**. Nur der erste Schritt eines Tastendrucks kann ein Halbschritt sein.
+- **Duckschritte (v3.2):** Geduckt (Körperhöhen 70 / 50 / 30 cm) ergibt jeder Tastendruck von W/S (oder Pfeil hoch/runter) genau **einen Schritt von 10 cm** vorwärts oder rückwärts. Eine gehaltene Taste wiederholt den Schritt nicht; für den nächsten Schritt muss die Taste neu gedrückt werden. Duckschritte gelten als „Stehen“ (Suchradius 3 cm, Punkte mit 20 cm und 100 %), haben keine Drift und zählen nicht für den Driftzähler. Die vordere Hand blockiert den Schritt vorwärts wie beim Gehen (4.5), und eine Körperkollision wirkt wie gewohnt (Abschnitt 6). Die Schritte dienen dazu, sich einem Objekt in kleinen Stufen zu nähern und es abzutasten.
 - **Drift:** Nach den ersten 10 Schritten erhält jeder weitere Schritt eine zufällige Winkelabweichung von 1–2°, immer auf derselben Seite (Seite wird pro Session zufällig festgelegt). Die Abweichungen stapeln sich.
 - Die Drift ist abgeschaltet, solange die **Wandführung** aktiv ist (Abschnitt 7.4). Nach dem Ende der Wandführung wird der Schrittzähler auf 0 gesetzt; die Drift beginnt erst wieder nach 10 weiteren Schritten.
 - **Drehung:** in Schritten von 15° ± 1° zufällig, im Stehen oder Gehen, animiert (~0,35 s).
@@ -134,7 +140,7 @@ Realitätsprinzip: Niemand hält exakt eine Gerade oder dreht exakt um einen Win
   5. Danach kann der Spieler sich ducken (Tasten 1–4) und das Objekt abtasten.
 - **Getroffenes Körperteil:** Berührt der Körper gleichzeitig mehrere Teile, haben die Beine Vorrang (der Fuß trifft zuerst), danach Rumpf und Kopf. Der Kontaktpunkt liegt in der Draufsicht am dem Körpermittelpunkt nächsten Punkt des Objekts, in der Höhe in der Mitte des gemeinsamen Höhenbereichs. Rumpf- und Kopfkollisionen entstehen nur bei Objekten, die über den Beinen hängen (z. B. Balken, Lampen, Treppenunterseiten).
 
-## 7. Manuelle Ausrichtung und Wandführung
+## 7. Ausrichtung und Wandführung
 
 ### 7.1 Protokoll der Tastereignisse
 
@@ -152,7 +158,7 @@ Ein gültiges Tastpaar macht die Ausrichtung für 20 s **möglich** (HUD: „Aus
 
 ### 7.3 Ausführung (manuell)
 
-- Die Ausrichtung geschieht **nie automatisch**, sondern nur auf Tastendruck: **Leertaste** (zusätzlich Num 0).
+- Das Tastpaar allein dreht den Körper nie. Eine Drehung geschieht auf Tastendruck (**Leertaste**, zusätzlich Num 0) oder als automatische Parallelausrichtung beim Loslaufen (7.5).
 - Die Taste wirkt nur, solange eine Ausrichtung möglich ist (Tastpaar der letzten 20 s) und keine Drehanimation läuft; sonst tut sie nichts. Nach einer manuellen Drehung kann innerhalb dieser 20 s erneut ausgerichtet werden.
 - **Richtung nach der zuletzt verwendeten Tastrichtung:**
   - seitliches Tasten ergibt **parallel** zur Fläche. Von den zwei möglichen Richtungen wird die mit dem kleineren Drehwinkel gewählt.
@@ -169,6 +175,19 @@ Die Wandführung endet erst, wenn **beide** Bedingungen gleichzeitig erfüllt si
 2. Kein Objekt befindet sich innerhalb der Handreichweite, sodass innerhalb des aktuellen Tastbandes kein neuer Kontakt entstehen kann. Richtwert: horizontaler Abstand Körpermitte zur nächsten Fläche > 1,0 m (Konstante `LOCK_RELEASE_DIST`, abgeleitet aus Schulterabstand 20 cm + Armlänge 65 cm + Suchradius 7 cm, aufgerundet).
 
 Beim Ende der Wandführung gilt die Regel aus Abschnitt 5 (Schrittzähler auf 0). Manuelles Drehen beendet die Wandführung nicht, denn sie schaltet nur die Drift ab und erzwingt keine Blickrichtung.
+
+### 7.5 Automatische Parallelausrichtung beim Loslaufen (v3.2)
+
+Streckt der Spieler eine Hand seitlich aus (Maustaste links/rechts), hat diese Kontakt mit einer Wand und läuft er los, richtet sich der Körper automatisch parallel zur Wand aus.
+
+- **Auslöser:** Beginn eines aufrechten Schritts (Vollschritt oder Halbschritt, vorwärts oder rückwärts). Im Stehen und bei Duckschritten geschieht nichts.
+- **Bedingungen (alle):**
+  1. Eine seitlich tastende Hand hat Kontakt mit einer **senkrechten** Fläche (Normale ±X/±Y). Oberseiten zählen nicht. Tasten nach vorn löst die Ausrichtung nicht aus.
+  2. Die Blickrichtung weicht **höchstens 20°** von der Flächenrichtung ab. Gemessen wird der kleinere Winkel zu den beiden parallelen Richtungen.
+  3. Es läuft keine Drehanimation (der Spieler dreht sich gerade selbst).
+- **Wirkung:** Der Körper dreht sich animiert (~0,35 s) parallel zur Fläche, mit dem kleineren Drehwinkel. Die **Wandführung beginnt** (Drift aus, 7.4); die Drift des soeben begonnenen Schritts entfällt. Eine Drehung ab 1° zählt im Ausrichtungszähler des HUD wie eine manuelle Ausrichtung.
+- **Über 20° Abweichung** geschieht nichts. Der Spieler verlässt die Wand offenbar schräg oder will sich von ihr lösen. Die manuelle Ausrichtung (7.3) bleibt in jedem Fall möglich.
+- Die Prüfung erfolgt bei jedem Schritt, nicht nur beim ersten nach dem Stehen. Entsteht der Wandkontakt erst beim Gehen, greift die Ausrichtung also beim nächsten Schritt (spätestens nach 0,45 s). Nach der ersten Ausrichtung ist die Abweichung kleiner als 1°, so dass nichts mehr sichtbar geschieht.
 
 ## 8. Visualisierung
 
@@ -245,7 +264,7 @@ Alle Objekte stehen auf dem Boden. Ein Objekt der Höhe H ist in einer Stufe ert
 | Regal | 200 cm | Gehen und aufrecht (130–160 / 140–180), ebenso alle tieferen Stufen |
 | Pfeiler | 160 cm | Gehen und aufrecht (Kontakt 130–160 bzw. 140–160), ebenso alle tieferen Stufen |
 | Tisch, Sockel | 75 cm | erst ab h = 50 (60–100, Kontakt 60–75), ebenso h = 30 |
-| Kiste | 50 cm | nur h = 30 (20–60, Kontakt 20–50) |
+| Kiste | 50 cm | nur h = 30 (5–60, Kontakt 5–50) |
 
 Damit erzwingen nur Tisch, Sockel und Kiste die Duckmechanik. Regal und Pfeiler werden schon im Gehen bemerkt (Handkontakt, Körper bleibt stehen).
 
@@ -253,17 +272,17 @@ Damit erzwingen nur Tisch, Sockel und Kiste die Duckmechanik. Regal und Pfeiler 
 
 | Eingabe | Aktion |
 | --- | --- |
-| W / S oder Pfeiltasten hoch/runter | vorwärts / rückwärts gehen (nur aufrecht) |
+| W / S oder Pfeiltasten hoch/runter | vorwärts / rückwärts gehen; geduckt ein Schritt von 10 cm je Tastendruck |
 | A / D oder Pfeiltasten links/rechts | Drehung 15° ± 1° pro Schritt; Gehtaste kurz = Halbschritt, gehalten = Vollschritte |
 | 1–4 | Körperhöhe (aufrecht … geduckt) |
 | Maus bewegen | Hände führen (Höhe, Spannweite) |
 | keine / linke / rechte Maustaste | Tastmodus (vorn / links / rechts) |
-| Leertaste (zusätzlich Num 0) | Ausrichtung ausführen (nur wenn „Ausrichtung möglich") |
+| Leertaste (zusätzlich Num 0) | Ausrichtung ausführen (nur wenn „Ausrichtung möglich"); beim Loslaufen mit seitlichem Wandkontakt richtet der Körper sich bis 20° Abweichung automatisch parallel aus |
 
 ## 11. Offene Punkte
 
 - **Spielziel (bewusst zurückgestellt):** Aktuell geht es um das Steuerungs- und Visualisierungskonzept. Vorschlag für später: Triggerzone etwa 1 m hinter der Lücke der Nordwand beendet das Level; Rückmeldung durch kurzes Aufhellen und Statistik (Zeit, Kollisionen, Tastpunkte). Zeitdruck zunächst weglassen.
-**Entschieden (zuvor offen):** Gehen nur aufrecht (4.3); Körper gestapelt, Kollisionsprüfung in 3D (Abschnitt 3); `LOCK_RELEASE_DIST` = 1,0 m (7.4); Lösen der klebenden Hand bei 10 cm Abweichung (4.4); zweistufiges Gedächtnis (8.3); Kollisionsfaktoren (6); Mehrgeschossigkeit wird eingeplant (15); Pfeiler 1,6 m (Abschnitt 9).
+**Entschieden (zuvor offen):** Gehen nur aufrecht, geduckt Einzelschritte von 10 cm ohne Wiederholen (4.3, 5); automatische Parallelausrichtung bis 20° (7.5); tiefste Tasthöhe 5 cm, Boden nie ertastbar (4.3); Körper gestapelt, Kollisionsprüfung in 3D (Abschnitt 3); `LOCK_RELEASE_DIST` = 1,0 m (7.4); Lösen der klebenden Hand bei 10 cm Abweichung (4.4); zweistufiges Gedächtnis (8.3); Kollisionsfaktoren (6); Mehrgeschossigkeit wird eingeplant (15); Pfeiler 1,6 m (Abschnitt 9).
 
 - **Tast-Identität:** Objekte erhalten einen Typ mit eigenem Punktmuster, z. B. Regal mit Lamellen als horizontale Streifen, Pfeiler als vertikale Punktreihe. Reine Darstellungssache, später ergänzbar.
 - **Level-System:** feste Handlevel oder prozedural.
@@ -293,13 +312,16 @@ Alle Werte liegen in einer zentralen Konstantenklasse und lassen sich ohne Eingr
 | Drift: Start nach / Betrag | 10 Schritten / 1–2° |
 | Drehschritt / Zufall / Dauer | 15° / ±1° / 0,35 s |
 | Einzelschritt (kurzer Tastendruck) | 25 cm |
+| Duckschritt (geduckt, je Tastendruck) | 10 cm |
 | Gehen-Nachlauf | 0,3 s |
 | Ausrichtung: Abstand der Tastpunkte | 20–80 cm |
 | Ausrichtung: Zeitfenster / Gültigkeit | 20 s / 20 s |
 | Ausrichtung: Mindestzeitabstand des Tastpaars | 0,4 s |
+| Automatische Ausrichtung: größte Abweichung | 20° |
 | `LOCK_RELEASE_DIST` | 1,0 m |
 | Hand-Lösen bei klebendem Kontakt | 10 cm |
 | Armlänge min / max | 25 cm / 65 cm |
+| Tiefste Tasthöhe (`TAST_MIN_HOEHE`) | 5 cm |
 | Tastbänder | siehe 4.3 |
 
 ## 13. Auftrag für die KI / nächste Iteration
@@ -310,9 +332,9 @@ Implementiere (oder analysiere) dieses Konzept als spielbaren Prototyp in Java (
 2. Tastpunkte nur bei echter Berührung, max. alle 0,5 s pro Hand, modusabhängige Größe (10/20 cm) und Starthelligkeit (50/100 %). Anhaltender Kontakt: Hand klebt (4.4).
 3. Kurzzeitgedächtnis: exponentielles Verblassen auf 2,5 % in 15 s (Punkt im Gehen) bzw. 30 s (im Stehen); danach Langzeitgedächtnis mit Verblassungsgruppen (Abschnitt 8.3).
 4. Kollisionsereignis = halber Schritt (25 cm) rückwärts + Stillstand + Dämpfung aller aktiven Visualisierungen mit 0,7 / 0,55 / 0,4 (Bein / Rumpf / Kopf) + Tastpunkt am Kontaktpunkt mit den Regeln des Gehens.
-5. Zufallsdrift nach 10 Schritten (1–2°, feste Seite), Drehschritte 15° ± 1°, Einzeldruck = Halbschritt, gehaltene Taste = Vollschritte. Drift aus während der Wandführung.
-6. Tastbänder nach Abschnitt 4.3; Gehen/Stehen nach der Definition mit 0,3 s Nachlauf; Gehen nur bei Körperhöhe 90 cm.
-7. Manuelle Ausrichtung nach Abschnitt 7: Protokoll in jedem Modus, Tastpaar (gleiche Fläche, 20–80 cm, 0,4–20 s), Ausführung nur per Leertaste/Num 0, Parallel (seitliches Tasten) oder Senkrecht (Tasten nach vorn), Wandführung ab gültigem Tastpaar bis kein Objekt mehr in Reichweite.
+5. Zufallsdrift nach 10 Schritten (1–2°, feste Seite), Drehschritte 15° ± 1°, Einzeldruck = Halbschritt, gehaltene Taste = Vollschritte. Geduckt: ein Schritt von 10 cm je Tastendruck (keine Wiederholung, keine Drift). Drift aus während der Wandführung.
+6. Tastbänder nach Abschnitt 4.3 (tiefste Tasthöhe 5 cm, Boden nie ertastbar); Gehen/Stehen nach der Definition mit 0,3 s Nachlauf; Gehen nur bei Körperhöhe 90 cm.
+7. Manuelle Ausrichtung nach Abschnitt 7: Protokoll in jedem Modus, Tastpaar (gleiche Fläche, 20–80 cm, 0,4–20 s), Ausführung nur per Leertaste/Num 0, Parallel (seitliches Tasten) oder Senkrecht (Tasten nach vorn), Wandführung ab gültigem Tastpaar bis kein Objekt mehr in Reichweite. Zusätzlich automatische Parallelausrichtung beim Loslaufen mit seitlichem Wandkontakt bis 20° Abweichung (Abschnitt 7.5).
 8. Hände synchron gespiegelt, im Körper-Koordinatensystem geführt (drehen immer mit), synchroner Stopp bei einseitigem Kontakt, definierte Startpose.
 9. Alle Balancing-Werte in einer zentralen Konstantenklasse (Abschnitt 12).
 
@@ -334,6 +356,9 @@ Beim Umsetzen mussten einige Details festgelegt werden, die das Konzept offenlie
 | Drift | Wird pro Schritt anteilig als Drehung während des Schritts angewendet. Vorwärts- und Rückwärtsschritte zählen. |
 | Ausrichtung | Nur senkrechte Flächen (Normale ±X/±Y). Beim Ausführen mit weniger als 1° Drehung wird nicht gezählt. Die Wandführung beginnt schon mit dem gültigen Tastpaar. |
 | Tastabstand | Der Abstand der Tastpunkte für die Ausrichtung ist der 3D-Abstand. |
+| Automatische Ausrichtung (v3.2) | Wird beim Beginn jedes aufrechten Schritts geprüft (Körper meldet den Schrittbeginn, das Spiel ruft `Ausrichtung.beiSchrittBeginn`). Sie schaltet die Wandführung ein, verwirft die Drift des begonnenen Schritts und zählt im selben Zähler wie die manuelle Ausrichtung. |
+| Duckschritte (v3.2) | Jeder Tastendruck ergibt genau einen Schritt von 10 cm; nach dem Schritt sperrt die Gehsperre bis zum Loslassen der Taste. Kein Halbschritt, keine Drift, Modus „Stehen“. Die Blockade durch die vordere Hand gilt unverändert. |
+| Tastband und Boden (v3.2) | Das tiefste Band beginnt bei 5 cm. Die Hände sondieren ohne Boden (`Welt.sondiere(..., false)`); die Variante mit Boden bleibt für die Welt und die Tests erhalten. |
 | Wandführung | Endet, wenn keine Hand Kontakt hat und der horizontale Abstand zur nächsten Fläche im aktuellen Tastband größer als 1,0 m ist. |
 | Kamera | Auge in der Kopfmitte (Körperhöhe + 70 cm), Sichtfeld 120°, Blick fest an die Körperausrichtung gebunden. |
 | Entwicklungshilfe | F3 blendet eine Draufsicht ein (nur zum Testen, widerspricht dem Blind-Konzept). F1 blendet die Hilfe ein, R startet neu. |
@@ -348,6 +373,7 @@ Gebäude mit mehreren Etagen sind Ziel des Spiels (GDD Abschnitte 2, 3 und 10). 
 - **Treppen** werden aus Stufenquadern (Stufenhöhe etwa 18 cm, Auftritt etwa 28 cm) aufgebaut, nicht aus Schrägen. Damit bleibt die achsenparallele Quader-Welt erhalten, Tastproben und Wandführung funktionieren unverändert.
 - **Körperhöhe über Grund:** Die Körperposition erhält eine Fußhöhe z. Der Körper steigt eine Stufe, wenn sie nicht höher als die Schrittstufe (etwa 25 cm) ist; höhere Kanten sind Hindernisse (Beinkollision). Beinzylinder, Oberkörper und Kopf sitzen weiterhin gestapelt auf der Fußhöhe. Die Kamera folgt der Fußhöhe weich.
 - **Tastbänder** gelten relativ zur Fußhöhe (Hände sind am Körper befestigt).
+- **Stufen ertasten (v3.2):** Mit dem tiefsten Band ab 5 cm sind Stufen (18 cm, 36 cm, ...) in der Körperhöhe 30 cm ertastbar (Band 5–60 cm); höhere Stufen auch in den höheren Stufen, sobald das Band unter der Stufenkante beginnt. Die Duckschritte von 10 cm (Abschnitt 5) helfen, sich einer Stufe zu nähern.
 - **Decken und Treppenunterseiten** sind schwebende Quader (`Welt.addSchwebend` existiert bereits). Dort sind Rumpf- und Kopfkollisionen möglich (Abschnitt 6).
 - **Kollisionspunkte und Tastpunkte** sind bereits dreidimensional und brauchen keine Änderung; die Raumzellen der Verblassungsgruppen sind ebenfalls 3D.
 - **Wandführung:** `naechsterAbstand` und die Tastbänder gelten je Etage (Quader außerhalb des Tastbands zählen nicht).
@@ -374,4 +400,5 @@ Eine Umsetzung ist für Phase 3 des GDD vorgesehen und erfordert die Änderungen
 | Mehrgeschossigkeit | Treppen, Podeste | geplant (15.1) |
 | Audio | später, unterstützend | später; Prototyp bewusst ohne Audio |
 | Tastpunkt-Menge | – | durch Verblassungsgruppen begrenzt |
+| Automatische Ausrichtung, Duckschritte, Tastband ab 5 cm | – (nicht im GDD) | konzeptinterne Ergänzungen (v3.2), kein Widerspruch zum GDD; GDD Abschnitt 14 nennt Bewegungsungenauigkeit als Schwierigkeitsfaktor, die Wandführung mildert sie an Wänden |
 | Darstellung | nur Schwarz/Weiß | übernommen für die Tastpunkte (weiß auf schwarz). Die Handränder (hell, bei Kontakt orange) und das HUD sind Rückmeldungen des Prototyps und bleiben farbig |

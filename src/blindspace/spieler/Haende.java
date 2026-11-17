@@ -13,7 +13,8 @@ import blindspace.welt.Welt;
  * immer exakt mit dem Körper mit. Die Hände folgen einer Zielposition, die aus der Mauseingabe entsteht, und
  * stoppen bei Kontakt. Klebt eine Hand an einer Fläche, steht auch die andere still (synchroner Stopp). Die
  * klebende Hand löst sich erst, wenn das Ziel um {@code HAND_LOESEN} seitlich oder von der Fläche weg
- * abweicht, und gleitet dann an der Fläche zum neuen Ziel.
+ * abweicht, und gleitet dann an der Fläche zum neuen Ziel. Die Hände tasten nie den Boden selbst; ertastbar
+ * ist nur, was im Tastband (ab {@code TAST_MIN_HOEHE}) liegt.
  * </p>
  */
 public final class Haende {
@@ -213,7 +214,7 @@ public final class Haende {
             h.neuerKontakt = false;
             double[] w = weltPos(k, h);
             if (h.haelt) {
-                Beruehrung b = welt.sondiere(w[0], w[1], w[2], HALTE_RADIUS);
+                Beruehrung b = welt.sondiere(w[0], w[1], w[2], HALTE_RADIUS, false);
                 if (b == null) {
                     h.haelt = false;
                     h.gleitet = false;
@@ -223,7 +224,7 @@ public final class Haende {
                 }
             } else if (!h.gleitet) {
                 // Kontakt durch Körperbewegung entstanden
-                Beruehrung b = welt.sondiere(w[0], w[1], w[2], radius);
+                Beruehrung b = welt.sondiere(w[0], w[1], w[2], radius, false);
                 if (b != null) {
                     festhalten(k, h, b);
                     h.neuerKontakt = true;
@@ -239,7 +240,7 @@ public final class Haende {
         // Kontaktstatus für Tastpunkte
         for (Hand h : alle()) {
             double[] w = weltPos(k, h);
-            h.kontakt = welt.sondiere(w[0], w[1], w[2], (h.haelt || h.gleitet) ? HALTE_RADIUS : radius);
+            h.kontakt = welt.sondiere(w[0], w[1], w[2], (h.haelt || h.gleitet) ? HALTE_RADIUS : radius, false);
         }
     }
 
@@ -316,7 +317,7 @@ public final class Haende {
             for (Hand h : alle()) {
                 if (!h.gleitet) {
                     double[] w = weltPos(k, h);
-                    Beruehrung b = welt.sondiere(w[0], w[1], w[2], radius);
+                    Beruehrung b = welt.sondiere(w[0], w[1], w[2], radius, false);
                     if (b != null) {
                         festhalten(k, h, b);
                         h.neuerKontakt = true;
@@ -339,7 +340,7 @@ public final class Haende {
                     + (h.bz - vor[2]) * (h.bz - vor[2]));
             double[] w = weltPos(k, h);
             // Ein bestehender Kontakt bleibt beim Gleiten bis HALTE_RADIUS erhalten (Hysterese).
-            Beruehrung b = welt.sondiere(w[0], w[1], w[2], HALTE_RADIUS);
+            Beruehrung b = welt.sondiere(w[0], w[1], w[2], HALTE_RADIUS, false);
             if (b == null) {
                 h.gleitet = false;
             } else if (moved < 0.0005) {
