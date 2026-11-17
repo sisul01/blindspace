@@ -2,19 +2,25 @@ package blindspace.test;
 
 import static blindspace.konfig.Konstanten.*;
 
+import blindspace.anzeige.Ansicht;
 import blindspace.levels.Level;
 import blindspace.spiel.Spiel;
 import blindspace.spieler.Ausrichtung;
 import blindspace.spieler.Haende;
 import blindspace.spieler.Koerper;
+import blindspace.tasten.Tastkante;
 import blindspace.tasten.Tastpunkt;
 import blindspace.tasten.Tastpunkte;
 import blindspace.welt.Beruehrung;
+import blindspace.welt.Kantenstueck;
 import blindspace.welt.Koerperteil;
 import blindspace.welt.Objektart;
 import blindspace.welt.Oberflaeche;
 import blindspace.welt.Quader;
 import blindspace.welt.Welt;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.util.List;
 
 /**
  * Headless-Selbsttest der Kernregeln des Konzepts (ohne JUnit, ohne Fenster).
@@ -51,6 +57,10 @@ public final class Selbsttest {
         handLoesenUndGleiten();
         seitlichesTastenStopptNichtUndRichtetAus();
         autoAusrichtungGrenzen();
+        kantenGeometrie();
+        kantenGedaechtnis();
+        kantenImSpiel();
+        kantenDarstellung();
         ausrichtungSenkrechtUndParallel();
         ausrichtungNurMitMoeglichkeit();
         ausrichtungKriterien();
@@ -759,6 +769,265 @@ public final class Selbsttest {
         }
         pruefe(kurse.size() > 30, "Startrichtung streut bei Start und Neustart (" + kurse.size() + " verschiedene Werte)");
         pruefe(new Spiel(1).koerper.kurs == new Spiel(2).koerper.kurs, "Spiel mit Seed: feste Richtung des Levels");
+    }
+
+    /**
+     * Verschiebt den Körper stetig (1 cm je Simulationsschritt) in Y-Richtung, damit die Hände unterwegs Kontakt
+     * bekommen wie beim Gehen und nicht in ein Objekt hineinspringen.
+     *
+     * @param s    Spiel
+     * @param ziel Ziel-Y-Koordinate des Körpers
+     */
+    static void geheY(Spiel s, double ziel) {
+        while (Math.abs(ziel - s.koerper.y) > 1e-9) {
+            s.koerper.y += Math.max(-0.01, Math.min(0.01, ziel - s.koerper.y));
+            s.schritt(SIM_DT);
+        }
+    }
+
+    /**
+     * Erzeugt ein Kantenstück für Tests (senkrechte Kante an der Ecke eines Quaders mit ID 1).
+     *
+     * @param oberflaeche Oberflächenart des Quaders
+     * @return ein Kantenstück bei (0 | 2) von z = 1,0 bis 1,2
+     */
+    static Kantenstueck teststueck(Oberflaeche oberflaeche) {
+        return new Kantenstueck(1, 2, 0, 0, 2, 0, 2.0, 1.0, 0, 2.0, 1.2, oberflaeche);
+    }
+
+    /**
+     * Prüft, welche Kantenstücke eine Berührung ertastet: nur nahe einer Kante (5 cm), Raster ab dem
+     * Kantenanfang, Ecken mit mehreren Kanten, keine Bodenkanten.
+     */
+    static void kantenGeometrie() {
+        titel("Kanten: Welche Berührungen ertasten eine Kante? (Abschnitt 8.5)");
+        Welt w = new Welt();
+        w.add("Pfeiler", Objektart.SAEULE, Oberflaeche.GLATT, 1.0, 2.0, 1.4, 2.4, 1.6);
+        List<Kantenstueck> k;
+
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.0, 2.0, 1.0, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        pruefe(k.size() == 1 && k.get(0).achse() == 2, "senkrechte Vorderkante: genau eine Kante, Richtung Z");
+        pruefe(k.get(0).zelle() == 2 && Math.abs(k.get(0).z0() - 0.8) < 1e-9 && Math.abs(k.get(0).z1() - 1.2) < 1e-9
+                && k.get(0).x0() == 1.0 && k.get(0).y0() == 2.0 && k.get(0).x1() == 1.0 && k.get(0).y1() == 2.0,
+                "Stück 2 (z 0,8 bis 1,2) auf der Kante bei (1,0 | 2,0)");
+        pruefe(k.get(0).seiteA() == 0 && k.get(0).seiteB() == 0 && k.get(0).objektId() == 1, "Lage der Kante und Objekt-ID");
+
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.2, 2.0, 1.0, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        pruefe(k.isEmpty(), "Flächenmitte (20 cm von den Kanten): keine Kante");
+
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.0, 2.049, 1.0, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        pruefe(k.size() == 1, "4,9 cm von der Kante entfernt: ertastet");
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.0, 2.06, 1.0, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        pruefe(k.isEmpty(), "6 cm von der Kante entfernt: nicht ertastet");
+
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.2, 2.0, 1.58, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        pruefe(k.size() == 1 && k.get(0).achse() == 0 && k.get(0).z0() == 1.6 && k.get(0).z1() == 1.6
+                && k.get(0).x0() == 1.0 && Math.abs(k.get(0).x1() - 1.4) < 1e-9, "Oberkante: Kante in X-Richtung bei z = 1,6");
+
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.0, 2.0, 1.6, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        pruefe(k.size() == 3 && k.stream().map(Kantenstueck::achse).distinct().count() == 3, "Ecke oben: drei Kanten (X, Y, Z)");
+
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.0, 2.0, 0.03, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        pruefe(k.size() == 1 && k.get(0).achse() == 2, "Ecke am Boden: nur die senkrechte Kante, keine Bodenkanten");
+
+        k = w.kanten(new Beruehrung(1, 1, -1, 1.0, 2.0, 1.599, 0.0, Oberflaeche.GLATT, Objektart.SAEULE), KANTE_TOLERANZ,
+                KANTE_LAENGE);
+        Kantenstueck senkrecht = k.stream().filter(x -> x.achse() == 2).findFirst().orElse(null);
+        pruefe(senkrecht != null && senkrecht.zelle() == 3 && Math.abs(senkrecht.z0() - 1.2) < 1e-9
+                && Math.abs(senkrecht.z1() - 1.6) < 1e-9, "letztes Stück endet an der Quaderkante (1,2 bis 1,6)");
+
+        Kantenstueck s1 = w.kanten(new Beruehrung(1, 1, -1, 1.0, 2.0, 0.9, 0.0, Oberflaeche.GLATT, Objektart.SAEULE),
+                KANTE_TOLERANZ, KANTE_LAENGE).get(0);
+        Kantenstueck s2 = w.kanten(new Beruehrung(1, 0, -1, 1.0, 2.02, 1.1, 0.0, Oberflaeche.GLATT, Objektart.SAEULE),
+                KANTE_TOLERANZ, KANTE_LAENGE).get(0);
+        pruefe(s1.equals(s2), "zwei Berührungen im selben Stück liefern dasselbe Kantenstück");
+
+        pruefe(w.kanten(new Beruehrung(Welt.BODEN_ID, 2, 1, 1.0, 2.0, 0.0, 0.0, Oberflaeche.GLATT, Objektart.SONSTIGES),
+                KANTE_TOLERANZ, KANTE_LAENGE).isEmpty(), "der Boden hat keine Kanten");
+        pruefe(w.kanten(new Beruehrung(99, 0, 1, 1.0, 2.0, 1.0, 0.0, Oberflaeche.GLATT, Objektart.SONSTIGES),
+                KANTE_TOLERANZ, KANTE_LAENGE).isEmpty(), "unbekannte Objekt-ID: keine Kante");
+    }
+
+    /**
+     * Prüft das Gedächtnis der Kanten: Helligkeitsverlauf in zwei Phasen ohne Sprung, Auffrischen, Dämpfung durch
+     * Kollisionen und Löschen.
+     */
+    static void kantenGedaechtnis() {
+        titel("Kanten: Verblassen, Auffrischen, Kollision (Abschnitte 8.2, 8.5)");
+        Tastkante k = new Tastkante(teststueck(Oberflaeche.GLATT), 10.0, KANTE_HELLIGKEIT_STEHEN, KZ_DAUER_STEHEN);
+        pruefe(Math.abs(k.helligkeit(10.0) - KANTE_HELLIGKEIT_STEHEN) < 1e-12, "Starthelligkeit im Stehen 100 %");
+        pruefe(KANTE_HELLIGKEIT_GEHEN > HELLIGKEIT_GEHEN && KANTE_HELLIGKEIT_STEHEN >= HELLIGKEIT_STEHEN,
+                "Kanten sind im Gehen heller als Tastpunkte, im Stehen mindestens so hell");
+        pruefe(Math.abs(k.helligkeit(10.0 + KZ_DAUER_STEHEN) - KZ_REST) < 1e-9, "nach 30 s im Stehen Restanteil von 2,5 %");
+        double davor = k.helligkeit(10.0 + KZ_DAUER_STEHEN - 1e-6), danach = k.helligkeit(10.0 + KZ_DAUER_STEHEN + 1e-6);
+        pruefe(Math.abs(davor - danach) < 1e-6, "kein Sprung beim Übergang ins Langzeitgedächtnis");
+        double halb = k.helligkeit(10.0 + KZ_DAUER_STEHEN + LZ_DAUER / 2);
+        pruefe(Math.abs(halb - KZ_REST / 2) < 1e-6, "Langzeitphase: linear, nach der halben Dauer der halbe Rest");
+        pruefe(!k.abgelaufen(10.0 + KZ_DAUER_STEHEN + LZ_DAUER - 1) && k.abgelaufen(10.0 + KZ_DAUER_STEHEN + LZ_DAUER),
+                "Kante verschwindet nach Kurz- plus Langzeitdauer");
+        Tastkante str = new Tastkante(teststueck(Oberflaeche.STRUKTURIERT), 0, 1.0, KZ_DAUER_STEHEN);
+        pruefe(!str.abgelaufen(KZ_DAUER_STEHEN + LZ_DAUER * LZ_FAKTOR_STRUKTURIERT - 1)
+                && str.abgelaufen(KZ_DAUER_STEHEN + LZ_DAUER * LZ_FAKTOR_STRUKTURIERT), "Kanten strukturierter Objekte verblassen schneller");
+
+        Tastpunkte t = new Tastpunkte();
+        Kantenstueck st = teststueck(Oberflaeche.GLATT);
+        pruefe(t.kante(new Tastkante(st, 0, 1.0, KZ_DAUER_STEHEN)) && t.anzahlKanten() == 1, "neues Kantenstück aufgenommen");
+        pruefe(!t.kante(new Tastkante(st, KANTE_ERNEUERUNG / 2, 1.0, KZ_DAUER_STEHEN)) && t.anzahlKanten() == 1,
+                "Berührung im selben Stück innerhalb von 0,1 s: nichts Neues");
+        pruefe(t.kante(new Tastkante(st, 20.0, 1.0, KZ_DAUER_STEHEN)) && t.anzahlKanten() == 1
+                && t.kanten().iterator().next().t0 == 20.0, "erneute Berührung später: aufgefrischt, weiterhin ein Stück");
+        Kantenstueck anderes = new Kantenstueck(1, 2, 1, 0, 2, 1.4, 2.0, 1.0, 1.4, 2.0, 1.2, Oberflaeche.GLATT);
+        t.kante(new Tastkante(anderes, 20.0, 1.0, KZ_DAUER_STEHEN));
+        pruefe(t.anzahlKanten() == 2, "anderes Stück: eigener Eintrag");
+        double vor = t.kanten().iterator().next().helligkeit(21.0);
+        t.kollision(0.7, 21.0);
+        double nach = t.kanten().iterator().next().helligkeit(21.0);
+        pruefe(Math.abs(nach - 0.7 * vor) < 1e-12, "Kollision dämpft auch Kanten (hier Beine: 0,7)");
+        t.aufraeumen(20.0 + KZ_DAUER_STEHEN + LZ_DAUER + 1);
+        pruefe(t.anzahlKanten() == 0, "abgelaufene Kanten werden beim Aufräumen entfernt");
+        t.kante(new Tastkante(st, 0, 1.0, KZ_DAUER_STEHEN));
+        t.leeren();
+        pruefe(t.anzahlKanten() == 0, "leeren entfernt auch Kanten");
+    }
+
+    /**
+     * Prüft die Kantenerzeugung im Spiel: Hände treffen beim Herantreten die Pfeilerkante, Flächenmitten ergeben
+     * keine Kante, Kanten entstehen bei jedem Schritt (nicht nur im 0,5-s-Takt der Tastpunkte), Neustart löscht.
+     */
+    static void kantenImSpiel() {
+        titel("Kanten im Spiel: Hand trifft Kante beim Herantreten (Abschnitt 8.5)");
+        // Pfeiler im Testlevel: x 1,0 bis 1,4, y 2,0 bis 2,4, Höhe 1,6; Hände bei u = 0,25 genau an den Kanten
+        Spiel s = new Spiel(60);
+        s.koerper.x = 1.2;
+        s.koerper.y = 0.9;
+        s.koerper.kurs = 0;
+        s.eingabe.mausBewegt = true;
+        s.eingabe.mausU = 0.25;
+        s.eingabe.mausV = 0.05; // z = 1,42
+        lauf(s, 0.6);
+        for (Haende.Hand h : s.haende.alle()) {
+            h.tastTimer = 100; // Tastpunkte gesperrt: Kanten dürfen nicht vom 0,5-s-Takt abhängen
+        }
+        geheY(s, 1.3);
+        pruefe(s.tastpunkte.anzahl() == 0, "Aufbau: noch kein Tastpunkt (Takt gesperrt)");
+        int senkrechte = 0;
+        for (Tastkante k : s.tastpunkte.kanten()) {
+            if (k.stueck.achse() == 2 && k.stueck.objektId() == 12) {
+                senkrechte++;
+            }
+        }
+        pruefe(senkrechte == 2, "beide senkrechten Vorderkanten ertastet, unabhängig vom Tastpunkt-Takt (" + senkrechte + ")");
+        double hell = 0;
+        for (Tastkante k : s.tastpunkte.kanten()) {
+            hell = Math.max(hell, k.helligkeit(s.zeit()));
+        }
+        pruefe(hell > 0.9, "frische Kante fast mit voller Helligkeit (" + String.format("%.2f", hell) + ")");
+
+        Spiel m = new Spiel(61);
+        m.koerper.x = 1.2;
+        m.koerper.y = 0.9;
+        m.koerper.kurs = 0;
+        m.eingabe.mausBewegt = true;
+        m.eingabe.mausU = 0.0; // Hände bei x = 1,1 und 1,3: je 10 cm von den Kanten
+        m.eingabe.mausV = 0.3; // z = 1,52: 8 cm unter der Oberkante
+        lauf(m, 0.6);
+        geheY(m, 1.3);
+        lauf(m, 1.0);
+        pruefe(m.tastpunkte.anzahl() > 0 && m.tastpunkte.anzahlKanten() == 0,
+                "Flächenmitte berührt: Tastpunkte, aber keine Kante");
+
+        s.reset();
+        pruefe(s.tastpunkte.anzahlKanten() == 0, "Neustart löscht die Kanten");
+    }
+
+    /**
+     * Prüft die Darstellung der Kanten: helle Linie am erwarteten Bildpunkt, schwarz daneben, dunkler bei
+     * verblasster Kante, keine Ausgabe (und kein Fehler) für Kanten hinter der Kamera, Kürzen an der Bildebene.
+     */
+    static void kantenDarstellung() {
+        titel("Kanten: Darstellung als helle Linien (Abschnitt 8.5)");
+        int w = 1280, h = 720;
+        Spiel s = new Spiel(62, leeresLevel());
+        double ez = s.koerper.augenZ();
+        double f = (w / 2.0) / Math.tan(SICHTFELD / 2);
+        int px = w / 2, py = (int) Math.round(h / 2.0 - f * (1.1 - ez) / 2.0); // Mitte der Kante bei y = 2 m, z = 1,1
+        pruefe(py > 40 && py < h - 40, "Aufbau: erwarteter Bildpunkt (" + px + "|" + py + ") liegt im Bild");
+
+        BufferedImage leer = zeichne(s, w, h);
+        pruefe(helligkeit(leer, px, py) < 10, "ohne Kante bleibt der Bildpunkt schwarz");
+
+        s.tastpunkte.kante(new Tastkante(new Kantenstueck(1, 2, 0, 0, 2, 0, 2.0, 1.0, 0, 2.0, 1.2, Oberflaeche.GLATT),
+                s.zeit(), 1.0, KZ_DAUER_STEHEN));
+        BufferedImage mit = zeichne(s, w, h);
+        pruefe(helligkeit(mit, px, py) > 240, "frische Kante: weißer Kern (" + helligkeit(mit, px, py) + ")");
+        pruefe(helligkeit(mit, px + 80, py) < 10 && helligkeit(mit, px, py - 150) < 10, "neben und über der Linie bleibt es schwarz");
+        int breite = 0;
+        for (int x = px - 40; x <= px + 40; x++) {
+            if (helligkeit(mit, x, py) > 200) {
+                breite++;
+            }
+        }
+        pruefe(breite >= (int) KANTE_MIN_PIXEL - 1, "Linie mindestens " + (int) KANTE_MIN_PIXEL + " Pixel breit (" + breite + ")");
+
+        Spiel alt = new Spiel(63, leeresLevel());
+        alt.tastpunkte.kante(new Tastkante(teststueck(Oberflaeche.GLATT), alt.zeit() - 29.0, 1.0, KZ_DAUER_STEHEN));
+        pruefe(helligkeit(zeichne(alt, w, h), px, py) < helligkeit(mit, px, py) / 2, "verblasste Kante ist deutlich dunkler");
+
+        // Kanten außerhalb des Blickfelds: hinter der Kamera und an ihr vorbei
+        Spiel hinten = new Spiel(64, leeresLevel());
+        hinten.tastpunkte.kante(new Tastkante(new Kantenstueck(1, 2, 0, 0, 0, 0, -2.0, 1.0, 0, -2.0, 1.2, Oberflaeche.GLATT),
+                hinten.zeit(), 1.0, KZ_DAUER_STEHEN));
+        pruefe(helligkeit(zeichne(hinten, w, h), px, py) < 10, "Kante hinter der Kamera wird nicht gezeichnet");
+
+        Spiel quer = new Spiel(65, leeresLevel());
+        quer.tastpunkte.kante(new Tastkante(new Kantenstueck(1, 1, 0, 0, 0, 0, -1.0, 1.0, 0, 3.0, 1.0, Oberflaeche.GLATT),
+                quer.zeit(), 1.0, KZ_DAUER_STEHEN));
+        BufferedImage q = zeichne(quer, w, h);
+        int hell = 0;
+        for (int yy = 40; yy < h; yy++) {
+            if (helligkeit(q, px, yy) > 200) {
+                hell++;
+            }
+        }
+        pruefe(hell > 20, "Kante, die an der Kamera vorbeiläuft, wird an der Bildebene gekürzt und gezeichnet (" + hell + " Pixel)");
+    }
+
+    /**
+     * Zeichnet ein Spiel in ein Bild (ohne Hilfe, ohne Debug-Karte).
+     *
+     * @param s Spiel
+     * @param w Breite in Pixeln
+     * @param h Höhe in Pixeln
+     * @return das gezeichnete Bild
+     */
+    static BufferedImage zeichne(Spiel s, int w, int h) {
+        Ansicht a = new Ansicht(s);
+        a.setzeHilfe(false);
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        a.zeichne(g, w, h);
+        g.dispose();
+        return img;
+    }
+
+    /**
+     * Liefert die Helligkeit (größter Farbkanal) eines Bildpunkts.
+     *
+     * @param img Bild
+     * @param x   Spalte
+     * @param y   Zeile
+     * @return Helligkeit 0 bis 255
+     */
+    static int helligkeit(BufferedImage img, int x, int y) {
+        int rgb = img.getRGB(x, y);
+        return Math.max((rgb >> 16) & 0xFF, Math.max((rgb >> 8) & 0xFF, rgb & 0xFF));
     }
 
     /**

@@ -1,11 +1,13 @@
 package blindspace.tasten;
 
 import blindspace.konfig.Konstanten;
+import blindspace.welt.Kantenstueck;
 import blindspace.welt.Oberflaeche;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +19,12 @@ import java.util.Map;
  * {@link Konstanten#KZ_REST} (Gehen 15 s, Stehen 30 s). Danach werden sie ins <em>Langzeitgedächtnis</em>
  * überführt und je Raumzelle ({@link Konstanten#LZ_ZELLE}) und Oberflächenart zu {@link Verblassungsgruppe}n zusammengefasst, damit
  * die Zahl der zu verwaltenden Punkte klein bleibt. Gruppen verschwinden nach {@link Konstanten#LZ_DAUER}.
+ * </p>
+ *
+ * <p>
+ * Daneben verwaltet die Klasse die ertasteten {@link Tastkante}n. Von jedem Kantenstück gibt es höchstens eine
+ * Instanz; eine erneute Berührung ersetzt sie durch eine frische (Auffrischen). Eine Kante durchläuft beide
+ * Gedächtnisphasen selbst und wird nicht zu Gruppen zusammengefasst.
  * </p>
  */
 public final class Tastpunkte {
@@ -36,6 +44,9 @@ public final class Tastpunkte {
 
     /** Gruppen des Langzeitgedächtnisses je Raumzelle. */
     private final Map<Zelle, Verblassungsgruppe> gruppen = new HashMap<>();
+
+    /** Aktive Kantenstücke (Kurz- und Langzeitphase), je Stück höchstens eines; Einfügereihenfolge. */
+    private final Map<Kantenstueck, Tastkante> kanten = new LinkedHashMap<>();
 
     /** Erzeugt ein leeres Gedächtnis ohne Tastpunkte und Gruppen. */
     public Tastpunkte() {
@@ -70,6 +81,24 @@ public final class Tastpunkte {
             }
         }
         gruppen.values().removeIf(g -> g.abgelaufen(zeit));
+        kanten.values().removeIf(k -> k.abgelaufen(zeit));
+    }
+
+    /**
+     * Meldet ein ertastetes Kantenstück. Gibt es das Stück schon, wird es durch die neue Berührung aufgefrischt
+     * (Helligkeit und Zeit zurückgesetzt), allerdings höchstens alle {@link Konstanten#KANTE_ERNEUERUNG}
+     * Sekunden, damit bei dauerhaftem Kontakt nicht ständig neue Objekte entstehen.
+     *
+     * @param k neue Berührung des Kantenstücks
+     * @return true, wenn das Stück neu aufgenommen oder aufgefrischt wurde
+     */
+    public boolean kante(Tastkante k) {
+        Tastkante alt = kanten.get(k.stueck);
+        if (alt != null && k.t0 - alt.t0 < Konstanten.KANTE_ERNEUERUNG) {
+            return false;
+        }
+        kanten.put(k.stueck, k);
+        return true;
     }
 
     /**
@@ -106,6 +135,9 @@ public final class Tastpunkte {
         for (Verblassungsgruppe g : gruppen.values()) {
             g.daempfe(zeit, faktor);
         }
+        for (Tastkante k : kanten.values()) {
+            k.mult *= faktor;
+        }
     }
 
     /**
@@ -127,6 +159,24 @@ public final class Tastpunkte {
     }
 
     /**
+     * Liefert alle aktiven Kantenstücke.
+     *
+     * @return unveränderliche Sicht auf die Kantenstücke (Reihenfolge nach erster Aufnahme)
+     */
+    public java.util.Collection<Tastkante> kanten() {
+        return Collections.unmodifiableCollection(kanten.values());
+    }
+
+    /**
+     * Anzahl der aktiven Kantenstücke.
+     *
+     * @return Anzahl
+     */
+    public int anzahlKanten() {
+        return kanten.size();
+    }
+
+    /**
      * Anzahl der Kurzzeitpunkte.
      *
      * @return Anzahl
@@ -144,9 +194,10 @@ public final class Tastpunkte {
         return gruppen.size();
     }
 
-    /** Entfernt alle Punkte und Gruppen (z. B. beim Neustart). */
+    /** Entfernt alle Punkte, Gruppen und Kantenstücke (z. B. beim Neustart). */
     public void leeren() {
         liste.clear();
         gruppen.clear();
+        kanten.clear();
     }
 }

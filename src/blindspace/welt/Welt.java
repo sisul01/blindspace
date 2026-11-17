@@ -11,7 +11,8 @@ import java.util.List;
  * <p>
  * Die Klasse bietet Tastproben für die Hände ({@link #sondiere}), das Herausdrücken einer gleitenden Hand
  * aus Objekten ({@link #drueckeRaus}), die dreidimensionale Körperkollision ({@link #koerperKollidiert})
- * und eine Abstandsabfrage für die Wandführung ({@link #naechsterAbstand}). Konkrete Welten werden in
+ * und eine Abstandsabfrage für die Wandführung ({@link #naechsterAbstand}). Zu einer Berührung nahe einer
+ * Quaderkante liefert {@link #kanten} die ertasteten Kantenstücke. Konkrete Welten werden in
  * Klassen des Pakets {@code blindspace.levels} aufgebaut.
  * </p>
  */
@@ -108,6 +109,77 @@ public final class Welt {
     public void addSchwebend(String name, double x0, double y0, double z0, double x1, double y1, double z1) {
         quader.add(new Quader(quader.size() + 1, name, Objektart.SONSTIGES, Oberflaeche.GLATT, x0, y0, z0, x1, y1,
                 z1));
+    }
+
+    /**
+     * Bestimmt, ob ein Wert nahe an einer der beiden Grenzen eines Intervalls liegt.
+     *
+     * @param v   Wert
+     * @param lo  untere Grenze
+     * @param hi  obere Grenze
+     * @param tol größter erlaubter Abstand zur nächsten Grenze
+     * @return 0 bei Nähe zur unteren, 1 bei Nähe zur oberen Grenze (bei Gleichstand die untere), -1 sonst
+     */
+    private static int nahSeite(double v, double lo, double hi, double tol) {
+        double dLo = Math.abs(v - lo), dHi = Math.abs(v - hi);
+        if (Math.min(dLo, dHi) > tol + EPS) {
+            return -1;
+        }
+        return dLo <= dHi ? 0 : 1;
+    }
+
+    /**
+     * Liefert die Kantenstücke, die eine Berührung ertastet: Liegt der Berührpunkt in beiden Achsen, die
+     * senkrecht zu einer Quaderkante stehen, höchstens {@code toleranz} von der Quaderbegrenzung entfernt, ist
+     * diese Kante ertastet. An einer Ecke können das bis zu drei Kanten sein.
+     *
+     * <p>
+     * Die Kante wird ab ihrem Anfang in Stücke von {@code laenge} eingeteilt; geliefert wird das Stück, in dem der
+     * Berührpunkt liegt. Kanten auf Bodenhöhe (Unterkante eines auf dem Boden stehenden Quaders) zählen nicht,
+     * denn der Boden ist nie ertastbar und die Fußlinie ist keine eigene Form des Objekts.
+     * </p>
+     *
+     * @param b       die Berührung (Objekt und Berührpunkt)
+     * @param toleranz größter Abstand des Berührpunkts zur Kante
+     * @param laenge  Länge eines Kantenstücks
+     * @return die ertasteten Kantenstücke; leer, wenn der Punkt keiner Kante nahe liegt oder zum Boden gehört
+     */
+    public List<Kantenstueck> kanten(Beruehrung b, double toleranz, double laenge) {
+        Quader q = objekt(b.objektId());
+        if (q == null) {
+            return List.of();
+        }
+        double[] p = { b.px(), b.py(), b.pz() };
+        double[] lo = { q.minX, q.minY, q.minZ };
+        double[] hi = { q.maxX, q.maxY, q.maxZ };
+        List<Kantenstueck> ergebnis = new ArrayList<>();
+        for (int a = 0; a < 3; a++) {
+            int u = (a + 1) % 3, v = (a + 2) % 3;
+            int su = nahSeite(p[u], lo[u], hi[u], toleranz);
+            int sv = nahSeite(p[v], lo[v], hi[v], toleranz);
+            if (su < 0 || sv < 0) {
+                continue;
+            }
+            // Bodenkante: Die Querachse Z liegt an der Unterkante eines auf dem Boden stehenden Quaders
+            boolean bodenU = u == 2 && su == 0 && lo[2] <= EPS;
+            boolean bodenV = v == 2 && sv == 0 && lo[2] <= EPS;
+            if (bodenU || bodenV) {
+                continue;
+            }
+            double kantenLaenge = hi[a] - lo[a];
+            int stuecke = Math.max(1, (int) Math.ceil(kantenLaenge / laenge - EPS));
+            int zelle = Math.max(0, Math.min(stuecke - 1, (int) Math.floor((p[a] - lo[a]) / laenge)));
+            double von = lo[a] + zelle * laenge;
+            double bis = Math.min(hi[a], von + laenge);
+            double[] e0 = new double[3], e1 = new double[3];
+            e0[u] = e1[u] = su == 0 ? lo[u] : hi[u];
+            e0[v] = e1[v] = sv == 0 ? lo[v] : hi[v];
+            e0[a] = von;
+            e1[a] = bis;
+            ergebnis.add(new Kantenstueck(q.id, a, su, sv, zelle, e0[0], e0[1], e0[2], e1[0], e1[1], e1[2],
+                    q.oberflaeche));
+        }
+        return ergebnis;
     }
 
     /**
